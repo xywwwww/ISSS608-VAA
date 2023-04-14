@@ -1,5 +1,20 @@
 ---
 title: "ISSS608-VAA"
+author: "Wan Xinyu"
+image: wan xinyu aa -  xinyu.wan.2022@mitb.smu.edu.sg PP.jpg
+about:
+  template: jolla
+  image-shape: rectangle
+  image-width: 10em
+  links: 
+    - text: Email
+      icon: envelope
+      href: mailto:xinyu.wan.2022@mitb.smu.edu.sg
+    - text: Linkedin
+      icon: linkedin
+      href: https://www.linkedin.com/in/xinyu-wan-869b57192/
 ---
 
-Welcome to **ISSS608 Visual Analytics and Applications**. In this website you will find my coursework prepared for this course.
+Welcome to **ISSS608 Visual Analytics and Applications**.
+
+In this website you will find my coursework prepared for this course.

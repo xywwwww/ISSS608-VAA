@@ -16,7 +16,10 @@ website:
 
 format:
   html:
-    theme: superhero
+    theme:
+      light: flatly
+      dark: darkly
+    mainfont: cursive
     css: styles.css
     toc: true
 
