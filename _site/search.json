@@ -14,10 +14,45 @@
     "text": "The code chunk below uses p_load() of pacman package to check if tidyverse packages are installed in the computer. If they are, then they will be launched into R.\n\npacman::p_load(tidyverse)\n\n\n\n\n\nexam_data <- read_csv(\"data/Exam_data.csv\")\n\nRows: 322 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (4): ID, CLASS, GENDER, RACE\ndbl (3): ENGLISH, MATHS, SCIENCE\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message."
   },
   {
+    "objectID": "In-class_Ex/In-class_Ex01/In-class_Ex01.html",
+    "href": "In-class_Ex/In-class_Ex01/In-class_Ex01.html",
+    "title": "In-class_Ex01",
+    "section": "",
+    "text": "Using p_load() of pacman package to load tidyverse on\n\n\npacman::p_load(tidyverse)\n\n2.Importing data\n\nexam_data<- read_csv(\"data/Exam_data.csv\")\n\nRows: 322 Columns: 7\n── Column specification ────────────────────────────────────────────────────────\nDelimiter: \",\"\nchr (4): ID, CLASS, GENDER, RACE\ndbl (3): ENGLISH, MATHS, SCIENCE\n\nℹ Use `spec()` to retrieve the full column specification for this data.\nℹ Specify the column types or set `show_col_types = FALSE` to quiet this message.\n\n\n\n\nplot a horizontal bar chart looks similar to the figure below.\n\nChanging the colors of the plot panel background of theme_minimal() to light blue and the color of the grid lines to white.\n\n\nThe plotThe code chunk\n\n\n\n\n\n\n\n\n\n\n\nShow the code\nggplot(data=exam_data, aes(x=RACE)) +\n  geom_bar() +\n  coord_flip() +\n  theme_minimal() +\n  theme(\n    panel.background = element_rect(fill = \"lightblue\", colour = \"lightblue\", \n                                    size = 0.5, linetype = \"solid\"),\n    panel.grid.major = element_line(size = 0.5, linetype = 'solid', colour = \"white\"), \n    panel.grid.minor = element_line(size = 0.25, linetype = 'solid', colour = \"white\"))"
+  },
+  {
+    "objectID": "In-class_Ex/In-class_Ex01/In-class_Ex01.html#the-original-design",
+    "href": "In-class_Ex/In-class_Ex01/In-class_Ex01.html#the-original-design",
+    "title": "In-class_Ex01",
+    "section": "The original design",
+    "text": "The original design\nA simple vertical bar chart for frequency analysis. Critics:\n\ny-axis is not clear (i.e. count)\nTo support effective comparison , the bars should be sorted by their respective frequencies.\nFor static graph, frequency values should be added to provide addition information\n\n\n\n\n\n\n\nThe makeover designThe code chunk\n\n\nWith references to the critics on the earlier slide, create a makeover looks similar to the figure on the above.\n\n\n\n\n\n\n\n\n\nShow the code\nggplot(data=exam_data, \n       aes(x=reorder(RACE,RACE,\n                     function(x)-length(x)))) +\n  geom_bar() +\n  ylim(0,220) +\n  geom_text(stat=\"count\", \n      aes(label=paste0(..count.., \", \", \n      round(..count../sum(..count..)*100, 1), \"%\")),\n      vjust=-1) +\n  xlab(\"Race\") +\n  ylab(\"No. of\\nPupils\") +\n  theme(axis.title.y=element_text(angle = 0))\n\n\n\n\n\nThis code chunk uses fct_infreq() of forcats package\n\n\nShow the code\nexam_data %>%\n  mutate(RACE = fct_infreq(RACE)) %>%\n  ggplot(aes(x = RACE)) + \n  geom_bar()+\n  ylim(0,220) +\n  geom_text(stat=\"count\", \n      aes(label=paste0(..count.., \", \", \n      round(..count../sum(..count..)*100,\n            1), \"%\")),\n      vjust=-1) +\n  xlab(\"Race\") +\n  ylab(\"No. of\\nPupils\") +\n  theme(axis.title.y=element_text(angle = 0))"
+  },
+  {
     "objectID": "index.html",
     "href": "index.html",
     "title": "ISSS608-VAA",
     "section": "",
     "text": "Welcome to ISSS608 Visual Analytics and Applications.\nIn this website you will find my coursework prepared for this course."
+  },
+  {
+    "objectID": "In-class_Ex/In-class_Ex01/In-class_Ex01.html#the-original-design-1",
+    "href": "In-class_Ex/In-class_Ex01/In-class_Ex01.html#the-original-design-1",
+    "title": "In-class_Ex01",
+    "section": "The original design",
+    "text": "The original design\n\n\n`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.\n\n\n\n\n\n\nThe makeover designThe code chunk\n\n\n\nAdding mean and median lines on the histogram plot.\nChange fill color and line color\n\n\n\n\n\n\n\n\n\n\nShow the code\nggplot(data=exam_data, \n       aes(x= MATHS)) +\n  geom_histogram(bins=20, \n                 color=\"black\", \n                 fill=\"light blue\") +\n  geom_vline(aes(xintercept=mean(MATHS, na.rm=T)),\n             color=\"red\", \n             linetype=\"dashed\", \n             size=1) +\n  geom_vline(aes(xintercept=median(MATHS, na.rm=T)),\n             color=\"grey30\",\n             linetype=\"dashed\", \n             size=1)"
+  },
+  {
+    "objectID": "In-class_Ex/In-class_Ex01/In-class_Ex01.html#the-original-design-2",
+    "href": "In-class_Ex/In-class_Ex01/In-class_Ex01.html#the-original-design-2",
+    "title": "In-class_Ex01",
+    "section": "The original design",
+    "text": "The original design\nThe histogram on the left are elegantly designed but not informative. This is because they only reveal the distribution of English scores by gender but without context such as all pupils\n\nd <- exam_data\n\nggplot(d, aes(x = ENGLISH)) +\n  geom_histogram(data = d) +\n  facet_wrap(~ GENDER) +\n  theme_bw()\n\n`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.\n\n\n\n\n\n\nThe makeover designThe code\n\n\n\n\nWarning: `guides(<scale> = FALSE)` is deprecated. Please use `guides(<scale> =\n\"none\")` instead.\n\n\n`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.\n`stat_bin()` using `bins = 30`. Pick better value with `binwidth`.\n\n\n\n\n\n\n\n\n\nShow the code\nd <- exam_data   \nd_bg <- d[, -3]  \n\nggplot(d, aes(x = ENGLISH, fill = GENDER)) +\n  geom_histogram(data = d_bg, fill = \"grey\", alpha = .5) +\n  geom_histogram(colour = \"black\") +\n  facet_wrap(~ GENDER) +\n  guides(fill = FALSE) +  \n  theme_bw()"
+  },
+  {
+    "objectID": "In-class_Ex/In-class_Ex01/In-class_Ex01.html#the-original-design.",
+    "href": "In-class_Ex/In-class_Ex01/In-class_Ex01.html#the-original-design.",
+    "title": "In-class_Ex01",
+    "section": "The original design.",
+    "text": "The original design.\n\n\n\n\n\n\nThe makeover designThe code chunk\n\n\nCreate a makeover looks similar to the figure on the below\n\n\n\n\n\n\n\n\n\nShow the code\nggplot(data=exam_data, \n       aes(x=MATHS, y=ENGLISH)) +\n  geom_point() +\n  coord_cartesian(xlim=c(0,100),\n                  ylim=c(0,100)) +\n  geom_hline(yintercept=50,\n             linetype=\"dashed\",\n             color=\"grey60\",\n             size=1) + \n  geom_vline(xintercept=50, \n             linetype=\"dashed\",\n             color=\"grey60\",\n             size=1)\n\n\n\n\n\nAll credits of this in-class exercise goes to DR. Kam Tin Seong"
   }
 ]
