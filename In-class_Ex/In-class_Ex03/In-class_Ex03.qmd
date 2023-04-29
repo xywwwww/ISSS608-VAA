@@ -1,0 +1,6 @@
+---
+title: "In-class Exercise 3"
+author: "Wan Xinyu"
+edit: visual
+date: "29 April 2023"
+---
