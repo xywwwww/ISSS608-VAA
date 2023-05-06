@@ -1,0 +1,62 @@
+---
+title: "In-class_Ex04"
+author: "Wan Xinyu"
+date: "5 May 2023"
+date-modified: "`r Sys.Date()`"
+execute: 
+  echo: true
+  eval: true
+  warning: false 
+---
+
+```{r}
+pacman::p_load(rstatix, gt, patchwork, tidyverse)
+```
+
+```{r}
+exam_data<- read_csv("data/Exam_data.csv")
+```
+
+::: panel-tabset
+## The plot
+
+```{r}
+#| echo: false
+ggplot(exam_data,
+       aes(sample = ENGLISH)) +
+  stat_qq() + 
+  stat_qq_line()
+```
+
+## The code
+
+```{r}
+#| eval: false
+ggplot(exam_data,
+       aes(sample = ENGLISH)) +
+  stat_qq() + 
+  stat_qq_line()
+```
+:::
+
+::: callout-note
+We can see that the points deviates significantly from the straight diagonal line. This is a clear indication that the set of data is not normally distributed.
+:::
+
+```{r}
+#| echo: false
+qq <- ggplot(exam_data,
+       aes(sample=ENGLISH)) + 
+  stat_qq() +
+  stat_qq_line()
+
+sw_t <- exam_data %>%
+  shapiro_test(ENGLISH) %>%
+  gt()
+
+tmp <- tempfile(fileext = '.png')
+gtsave(sw_t, tmp)
+table_png <- png::readPNG(tmp, native = TRUE)
+
+qq + table_png
+```

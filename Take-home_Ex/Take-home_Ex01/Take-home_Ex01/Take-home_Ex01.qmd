@@ -1,0 +1,841 @@
+---
+title: "Take-home_Ex01"
+author: "Wan Xinyu"
+---
+
+# 1. The task
+
+The purpose of this take home exercise is to to reveal the demographic and financial characteristics of the city of Engagement, using appropriate static and interactive statistical graphics methods. This exercise requires a user-friendly and interactive solution that helps city managers and planners to explore the complex data in an engaging way and reveal hidden patterns.
+
+# 2. Data preparation
+
+## 2.1 Installing the data packages
+
+```{r}
+pacman::p_load(ggplot2, ggiraph, plotly, 
+               patchwork, DT, tidyverse,
+               ggrepel, ggthemes, hrbrthemes,
+               tidyverse) 
+```
+
+The unzipped files have been saved into a new folder named data for better organization.
+
+```{r}
+part_info <- read_csv("data/Participants.csv")
+```
+
+Participants.csv
+
+Contains information about the residents of City of Engagement that have agreed to participate in this study.
+
+-   participantId (integer): unique ID assigned to each participant.
+-   householdSize (integer): the number of people in the participant's household
+-   haveKids (boolean): whether there are children living in the participant's household.
+-   age (integer): participant's age in years at the start of the study.
+-   educationLevel (string factor): the participant's education level, one of: {"Low", "HighSchoolOrCollege", "Bachelors", "Graduate"}
+-   interestGroup (char): a char representing the participant's stated primary interest group, one of {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"}. Note: specific topics of interest have been redacted to avoid bias.
+-   joviality (float): a value ranging from \[0,1\] indicating the participant's overall happiness level at the start of the study.
+
+```{r}
+finance <- read_csv("data/FinancialJournal.csv")
+```
+
+FinancialJournal.csv
+
+Contains information about financial transactions.
+
+-   participantId (integer): unique ID corresponding to the participant affected
+-   timestamp (datetime): the time when the check-in was logged
+-   category (string factor): a string describing the expense category, one of {"Education", "Food", "Recreation", "RentAdjustment", "Shelter", "Wage"}
+-   amount (double): the amount of the transaction For explanation of Rent Adjustment, please refer to this [link](https://www.lawinsider.com/dictionary/rent-adjustment-amount)
+
+Lets first examine the properties of the participants csv file.
+
+::: panel-tabset
+## Quick peek
+
+```{r}
+head(part_info)
+```
+
+## Dataset structure
+
+```{r}
+str(part_info)
+```
+
+## Summary
+
+```{r}
+summary(part_info[, c("householdSize", "haveKids", "age", "educationLevel", "interestGroup", "joviality")])
+
+```
+
+## Further details on category variable
+
+```{r}
+table(part_info$interestGroup)
+table(part_info$educationLevel)
+```
+:::
+
+::: panel-tabset
+## Check for missing values
+
+```{r}
+sum(is.na(part_info))
+```
+
+## Check for outlier
+
+Next we will visualize some variables in document to see if there are any anomalies. From the chart below, we see that there exist no participants with extremely large age or low
+
+```{r}
+p1 <- ggplot(part_info, aes(x = age)) +
+  geom_bar() +
+  labs(title = "Distribution of Participants' Age",
+       x = "Age",
+       y = "No. of person")
+
+fig <- ggplotly(p1)
+
+fig <- fig %>% 
+  layout(xaxis = list(title = 'Age'), 
+         yaxis = list(title = 'No. of person'))
+
+
+p2 <- ggplot(part_info, aes(x = householdSize)) +
+  geom_bar() +
+  labs(title = "Distribution of house hold size",
+       x = "Household size",
+       y = "Count")
+
+fig2 <- ggplotly(p2)
+
+fig2 <- fig2 %>% 
+  layout(xaxis = list(title = 'Household size'), 
+         yaxis = list(title = 'Count'))
+
+
+
+fig3 <- subplot(fig, fig2, nrows = 1, titleY = TRUE, titleX = TRUE, margin = 0.1 ) %>%
+  layout(title = 'Outlier checking',
+         plot_bgcolor='#e5ecf6', 
+         xaxis = list( 
+           zerolinecolor = '#ffff', 
+           zerolinewidth = 2, 
+           gridcolor = 'ffff'), 
+         yaxis = list( 
+           zerolinecolor = '#ffff', 
+           zerolinewidth = 2, 
+           gridcolor = 'ffff')) %>%
+  
+  layout(annotations = list(
+      list(
+        x = 0.2,  
+        y = 1.0,  
+        text = "Distribution of Participants' Age",  
+        xref = "paper",  
+        yref = "paper",  
+        xanchor = "center",  
+        yanchor = "bottom",  
+        showarrow = FALSE 
+      ),
+      list(
+        x = 0.8,  
+        y = 1.0,  
+        text = "Distribution of house hold size",  
+        xref = "paper",  
+        yref = "paper",  
+        xanchor = "center",  
+        yanchor = "bottom",  
+        showarrow = FALSE 
+      )
+    ))
+
+fig3
+```
+:::
+
+Lets move on to examine the properties of the finance csv file.
+
+::: panel-tabset
+## Quick peak
+
+Sneak peak of the first few entries in the dataset
+
+```{r}
+head(finance)
+```
+
+## Dataset structure
+
+```{r}
+str(finance)
+```
+
+## Summary
+
+```{r}
+summary(finance[c("amount")])
+```
+
+## Further examination of categorical variable
+
+```{r}
+table(finance$category)
+```
+:::
+
+::: panel-tabset
+## Check for missing values
+
+```{r}
+sum(is.na(finance))
+```
+
+## Check for outliers
+
+Check for outlier in the amount variable. We first group the amount variables by the category. Then we do a box plot. From the chart we can observe that shelter has some abnormally small values to the negative end and wages has some exceptionally large values on the positive end. We may wish to take note of these in our analysis.
+
+```{r}
+
+# Create a box plot of amount by category
+ggplotly(ggplot(finance, aes(x = category, y = amount, fill = category)) +
+  geom_boxplot() +
+  xlab("Expense Category") +
+  ylab("Amount") +
+  ggtitle("Amount Spent by Expense Category"))
+
+```
+:::
+
+# 3. Data visualization
+
+Exploratory data analysis Lets now take alook at the demographic data provided in the dataset participants.csv
+
+::: panel-tabset
+## Age
+
+```{r}
+# Histogram of age
+v1<- ggplot(part_info, aes(x = age)) +
+  geom_bar(binwidth = 5) +
+  labs(title = "Distribution of Participant Age",
+       x = "Age (years)",
+       y = "Count")
+ggplotly(v1)
+```
+
+## Education level
+
+```{r}
+# Bar chart of education level
+v2<- ggplot(part_info, aes(x = educationLevel)) +
+  geom_bar() +
+  labs(title = "Education Level of Participants",
+       x = "Education Level",
+       y = "Count")
+ggplotly(v2)
+```
+
+## Household size
+
+```{r}
+# Pie chart of household size
+v3<- ggplot(part_info, aes(x = householdSize)) +
+  geom_bar() +
+  labs(title = "Household Size of Participants",
+       x = "Household size",
+       y = "Count")
+ggplotly(v3)
+```
+
+## Have kids
+
+```{r}
+# Bar chart of whether participants have children
+v4<- ggplot(part_info, aes(x = factor(haveKids))) +
+  geom_bar() +
+  labs(title = "Proportion of Participants with Children",
+       x = "Have Children",
+       y = "Count")
+ggplotly(v4)
+
+```
+
+## Interest group
+
+```{r}
+v5 <- ggplot(data = part_info, aes(x = interestGroup)) +
+      geom_bar(aes(text = paste("\n","Count: ", ..count.., "\n"," Percentage: ", scales::percent(..count../sum(..count..))))) +
+      labs(title = "Interest Group Distribution", x = "Interest Group", y = "Count")
+
+ggplotly(v5,tooltip = "text")
+```
+
+## Joviality
+
+```{r}
+v6<- ggplot(part_info, aes(x = joviality)) +
+  geom_histogram(binwidth = 0.05, fill = "grey", color = "white") +
+  labs(title = "Joviality Distribution", x = "Joviality", y = "Count")
+ggplotly(v6)
+
+```
+:::
+
+### 3.1 Exploring hidden patterns between variables in the participants csv
+
+Education vs age
+
+```{r , fig.height= 9, fig.width=15}
+v7<- ggplot(part_info, aes(x = age, fill = educationLevel)) +
+  geom_bar() +
+  labs(title = "Relationship between Age and Education Level",
+       x = "Age (years)",
+       y = "Education Level")
+v8<- ggplot(part_info, aes(x = age)) +
+  geom_bar() +
+  labs(title = "Age Distribution by Education Level",
+       x = "Age (years)",
+       y = "Count") +
+  facet_wrap(~ educationLevel, ncol = 2)
+
+v7 + v8
+
+```
+
+::: {.callout-note title="Note"}
+Added fig.height to make sure that the charts are not overly compressed
+:::
+
+We do not observe any distinct patterns and relationships between Age and Education for residents in town
+
+```{r}
+```
+
+Household size vs have kids
+
+```{r}
+ggplot(part_info, aes(x = haveKids, y = householdSize)) +
+  geom_jitter() +
+  scale_fill_gradient(low = "white", high = "blue") +
+  labs(title = "Relationship between Household Size and Having Children",
+       x = "Have Children",
+       y = "Household Size")
+
+
+
+```
+
+From here we can observe a pattern that only household with 3 person have kids while those with 2 do not. Hence provison of subsidies such as milk and diaper vouchers should only be provisioned to family with more than 3 household members
+
+Have kids vs education
+
+```{r}
+
+# Calculate percentage of each education level group with children
+edu_kids <- part_info %>%
+  group_by(educationLevel, haveKids) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = count / sum(count))
+
+# Plot the bar chart
+ggplotly(ggplot(edu_kids, aes(x = educationLevel, y = percentage, fill = haveKids)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Percentage of Participants with Children by Education Level",
+       x = "Education Level",
+       y = "Percentage with Children") +
+  scale_fill_manual(values = c("#E69F00", "#56B4E9"), labels = c("No", "Yes")))
+
+
+
+```
+
+From the above we can observe that observe that generally percentage of residents who have kids are generally lower that than percentage of residents who have kids. There seems to be an inverse relationship between education level and if a resident has kids.
+
+Next lets explore the mean age for residents who have and do not have kids
+
+```{r}
+tooltip <- function(y, ymax, accuracy = .01) {
+  mean <- scales::number(y, accuracy = accuracy)
+  sem <- scales::number(ymax - y, accuracy = accuracy)
+  paste("Mean age:", mean, "+/-", sem)
+}
+
+gg_point <- ggplot(data=part_info, 
+                   aes(x = haveKids),
+) +
+  stat_summary(aes(y = age, 
+                   tooltip = after_stat(  
+                     tooltip(y, ymax))),  
+    fun.data = "mean_se", 
+    geom = GeomInteractiveCol,  
+    fill = "light blue"
+  ) +
+  stat_summary(aes(y = age),
+    fun.data = mean_se,
+    geom = "errorbar", width = 0.2, size = 0.2
+  )
+
+girafe(ggobj = gg_point,
+       width_svg = 8,
+       height_svg = 8*0.618)
+```
+
+From the chart we do not observe any significant difference.
+
+```{r}
+edu_levels <- c("Low", "HighSchoolOrCollege", "Bachelors", "Graduate")
+
+# convert educationLevel column to factor with desired levels
+part_info$educationLevel <- factor(part_info$educationLevel, levels = edu_levels)
+
+grouped_data <- part_info %>%
+  group_by(educationLevel, interestGroup) %>%
+  summarise(count = n()) %>%
+  mutate(percentage = prop.table(count) * 100)
+
+# Create plot
+plot <- ggplot(grouped_data, aes(x = educationLevel, y = percentage, fill = interestGroup)) +
+  geom_col(position = "dodge") +
+  labs(title = "Percentage of Participants in Each Interest Group by Education Level",
+       x = "Education Level",
+       y = "Percentage") +
+  scale_fill_brewer(palette = "Set3") +
+  theme_economist_white()
+
+# Convert to interactive plot
+plotly_plot <- ggplotly(plot)
+plotly_plot
+
+```
+
+::: {.callout-note title="Note"}
+define the desired order of the education levels using the edu_levels vector. Then, we convert the educationLevel column to a factor with the desired levels using the factor() function and the levels
+:::
+
+No distinct patterns are observed
+
+mean joviality vs education
+
+```{r}
+tooltip <- function(y, ymax, accuracy = .01) {
+  mean <- scales::number(y, accuracy = accuracy)
+  sem <- scales::number(ymax - y, accuracy = accuracy)
+  paste("Mean jovility:", mean, "+/-", sem)
+}
+
+gg_point <- ggplot(data=part_info, 
+                   aes(x = educationLevel),
+) +
+  stat_summary(aes(y = joviality, 
+                   tooltip = after_stat(  
+                     tooltip(y, ymax))),  
+    fun.data = "mean_se", 
+    geom = GeomInteractiveCol,  
+    fill = "light blue"
+  ) +
+  stat_summary(aes(y = joviality),
+    fun.data = mean_se,
+    geom = "errorbar", width = 0.2, size = 0.2
+  )
+
+girafe(ggobj = gg_point,
+       width_svg = 8,
+       height_svg = 8*0.618)
+
+
+```
+
+Mean joviality seems to increae with high education level
+
+```{r}
+tooltip <- function(y, ymax, accuracy = .01) {
+  mean <- scales::number(y, accuracy = accuracy)
+  sem <- scales::number(ymax - y, accuracy = accuracy)
+  paste("Mean jovility:", mean, "+/-", sem)
+}
+
+gg_point <- ggplot(data=part_info, 
+                   aes(x = householdSize),
+) +
+  stat_summary(aes(y = joviality, 
+                   tooltip = after_stat(  
+                     tooltip(y, ymax))),  
+    fun.data = "mean_se", 
+    geom = GeomInteractiveCol,  
+    fill = "light blue"
+  ) +
+  stat_summary(aes(y = joviality),
+    fun.data = mean_se,
+    geom = "errorbar", width = 0.2, size = 0.2
+  )
+
+girafe(ggobj = gg_point,
+       width_svg = 8,
+       height_svg = 8*0.618)
+
+```
+
+We observe that mean joviality for single person household is lower than that of 2 and 3 person household.
+
+```{r}
+tooltip <- function(y, ymax, accuracy = .01) {
+  mean <- scales::number(y, accuracy = accuracy)
+  sem <- scales::number(ymax - y, accuracy = accuracy)
+  havekids <- unique(part_info$haveKids)
+  paste("Have Kids:", havekids, "<br>",
+        "Mean Joviality:", mean, "+/-", sem)
+}
+
+gg_point <- ggplot(data=part_info, 
+                   aes(x = haveKids),
+) +
+  stat_summary(aes(y = joviality, 
+                   tooltip = after_stat(  
+                     tooltip(y, ymax))),  
+    fun.data = "mean_se", 
+    geom = GeomInteractiveCol,  
+    fill = "light blue"
+  ) +
+  stat_summary(aes(y = joviality),
+    fun.data = mean_se,
+    geom = "errorbar", width = 0.2, size = 0.2
+  ) +
+  labs(title = "Relationship between Having Kids and Joviality",
+       x = "Have Kids",
+       y = "Joviality")
+
+girafe(ggobj = gg_point,
+       width_svg = 8,
+       height_svg = 8*0.618)
+
+
+```
+
+```{r}
+
+# group data by age and calculate mean joviality
+age_joviality <- aggregate(joviality ~ age, part_info, mean)
+
+# create plotly plot
+plot_ly(data = age_joviality, x = ~age, y = ~joviality, type = 'scatter', text = ~paste0("Age: ", age, "<br>Joviality: ", joviality)) %>%
+  add_trace(y = ~joviality, x = ~age, type = 'bar', name = 'Mean Joviality', marker = list(color = 'blue', opacity = 0.7)) %>%
+  layout(title = "Relationship between Age and Mean Joviality",
+         xaxis = list(title = "Age"),
+         yaxis = list(title = "Mean Joviality"))
+
+
+```
+
+From the plot we do not see a distinct trend with age and mean joviality. However,we can observe that resident of age 53 has the lowest mean joviality and resident of age 59 has the highest mean joviality
+
+```{r, fig.height=9}
+
+#REMOVEEE
+# create two data frames for age 53 and 59
+age53_joviality <- subset(part_info, age == 53)
+age59_joviality <- subset(part_info, age == 59)
+
+# create plotly subplot
+
+plot_ly(data = age53_joviality, 
+        x = ~joviality, 
+        type = 'box', 
+        marker = list(color = 'blue', opacity = 0.7), 
+        showlegend = FALSE) %>%
+  layout(title = "Joviality at Age 53",
+         xaxis = list(title = "Joviality"),
+         yaxis = list(title = "Count"))
+
+  
+```
+
+```{r, fig.height=9,fig.width=15}
+library(plotly)
+
+# Add a column to indicate outliers using IQR method
+is_outlier <- function(x) {
+  qnt <- quantile(x, probs=c(.25, .75), na.rm = TRUE)
+  H <- 1.5 * IQR(x, na.rm = TRUE)
+  x < (qnt[1] - H) | x > (qnt[2] + H)
+}
+
+# Create data subset for age 53
+age53_joviality <- subset(part_info, age == 53)
+
+# Create outlier column using is_outlier function
+age53_joviality$outlier <- is_outlier(age53_joviality$joviality)
+
+# Create ggplot box plot with outlier points colored red
+plot53 <- ggplot(data = age53_joviality, aes(x = 1, y = joviality)) +
+  geom_boxplot() +
+  geom_point(aes(x = jitter(1, factor = 0.3), y = joviality, color = outlier)) +
+  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red")) +
+  theme_bw() +
+  ggtitle("Joviality at Age 53") +
+  xlab("") +
+  ylab("Joviality")
+
+# Convert ggplot object to plotly
+plotly_object <- ggplotly(plot53)
+
+# Print plotly object
+plotly_object
+
+
+# Create data subset for age 59
+age59_joviality <- subset(part_info, age == 59)
+
+# Create outlier column using is_outlier function
+age59_joviality$outlier <- is_outlier(age59_joviality$joviality)
+
+# Create ggplot box plot with outlier points colored red
+plot59 <- ggplot(data = age59_joviality, aes(x = 1, y = joviality)) +
+  geom_boxplot() +
+  geom_point(aes(x = jitter(1, factor = 0.3), y = joviality, color = outlier)) +
+  scale_color_manual(values = c("FALSE" = "black", "TRUE" = "red")) +
+  theme_bw() +
+  ggtitle("Joviality at Age 59") +
+  xlab("") +
+  ylab("Joviality")
+# subplot for both plots
+subplot(plot53, plot59, nrows = 1, titleY = TRUE, titleX = TRUE, margin = 0.1 ) %>%
+  layout(title = 'Further checking',
+         plot_bgcolor='#e5ecf6', 
+         xaxis = list( 
+           zerolinecolor = '#ffff', 
+           zerolinewidth = 2, 
+           gridcolor = 'ffff'), 
+         yaxis = list( 
+           zerolinecolor = '#ffff', 
+           zerolinewidth = 2, 
+           gridcolor = 'ffff')) %>%
+  layout(annotations = list(
+    list(
+      x = 0.25,  
+      y = 1.0,  
+      text = "Distribution of Age 53 Participants' Joviality",  
+      xref = "paper",  
+      yref = "paper",  
+      xanchor = "center",  
+      yanchor = "bottom",  
+      showarrow = FALSE 
+    ),
+    list(
+      x = 0.75,  
+      y = 1.0,  
+      text = "Distribution of Age 59 Participants' Joviality",  
+      xref = "paper",  
+      yref = "paper",  
+      xanchor = "center",  
+      yanchor = "bottom",  
+      showarrow = FALSE 
+    )
+  ))
+
+```
+
+We can observe that joviality for age 53 residents are more concentrated to below 0.5 while joviality for age 59 residents are more evenly distributed across the axis. This confirms our expectation that age 53 residents may indeed be generally not joval while for age 59 residents, there is no general consensus observed and all holds their own opinion
+
+```{r}
+library(ggplot2)
+
+# Aggregate joviality by interest group
+joviality_interest <- aggregate(joviality ~ interestGroup, data = part_info, mean)
+
+# Plot mean joviality by interest group
+ggplot(data = joviality_interest, aes(x = interestGroup, y = joviality)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = round(joviality, 2)), vjust = -0.5) +
+  labs(x = "Interest Group", y = "Mean Joviality", 
+       title = "Mean Joviality by Interest Group")
+```
+
+Interest group E provides the highest mean joviality. If officials are looking to improve joviality among residents, they can look into actions such as subsidizing group E membership, etc.
+
+## 3.2 Exploring financial data
+
+Next we move on to explore variables in the financial data. Since every participant can have multiple entries. We will explore the data by grouping the entries according the participant's Id and the category
+
+Lets first take a look at the sum residents expenditure by category
+
+```{r}
+
+# Aggregate financial data by participant
+financial_data_agg <- finance %>%
+  group_by(participantId,category) %>%
+  summarize(total = sum(amount), .groups = "drop")
+
+# Financial summary
+expenses_summary <- financial_data_agg %>%
+  group_by(category) %>%
+  summarize(total = sum(total))
+
+# Bar chart of expenses by category
+expenses_plot <- ggplot(expenses_summary, aes(x = category, y = total)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Expense Category", y = "Total Amount Spent", title = "Expenses by Category") +
+  theme_minimal()
+ggplotly(expenses_plot)
+```
+
+In the chart above we realize wage is counted as part of expenditure We will remove wage since it is not exactly an expense that we will be looking at.
+
+```{r}
+# Aggregate financial data by participant
+financial_data_agg <- finance %>%
+   filter(category != "Wage") %>%
+  group_by(participantId, category) %>%
+  summarize(total = sum(amount), .groups = "drop")
+
+# Financial summary
+expenses_summary <- financial_data_agg %>%
+  group_by(category) %>%
+  summarize(total = sum(total))
+
+# Bar chart of expenses by category
+expenses_plot1 <- ggplot(expenses_summary, aes(x = category, y = total)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  labs(x = "Expense Category", y = "Total Amount Spent", title = "Expenses by Category") +
+  theme_minimal()
+ggplotly(expenses_plot1)
+```
+
+From the chart above we realize that shelter accounts for the main category for expenditure. This is followed by recreation, food and education. Rent adjustment is on the negative end which may be a indication that the landlord in the city has overall lowered their rents.
+
+```{r}
+# Aggregate financial data by category and timestamp
+financial_data_agg <- finance %>%
+  filter(category != "Wage") %>%
+  group_by(category, timestamp) %>%
+  summarize(avg_amount = mean(amount))
+
+# Line chart of average amount by timestamp, colored by category
+line_chart <- ggplot(financial_data_agg, aes(x = timestamp, y = avg_amount, color = category)) +
+  geom_line() +
+  labs(x = "Timestamp", y = "Average Amount", title = "Average Amount by Category over Time") +
+  theme_minimal()
+
+# Display the chart
+ggplotly(line_chart)
+```
+
+From the above chart, we observe that mapping average amount for category by days in the time stamp is not visually pleasing to see any patterns. But still if we zoom in, we can get som info from it. That is we can see that there are some major fluctuation in shelter amount and rent adjustment in march and April. Education amount is incurred on first day of the month and that if we zoom in. We can see that recreation and food demonstrates a regular pattern as shown in the pic below
+
+\[\]recreation and food.png
+
+Lets try to map above information in terms of months
+
+```{r, fig.height=9}
+# Extract month from timestamp
+financial_data_agg <- finance %>%
+  filter(category != "Wage") %>%
+  mutate(month = format(timestamp, "%Y-%m")) %>%
+  group_by(participantId, category, month) %>%
+  summarize(total = sum(amount), .groups = "drop")
+
+# Calculate average amount spent by category per month
+category_month_avg <- financial_data_agg %>%
+  group_by(category, month) %>%
+  summarize(avg_amount = mean(total))
+
+# Create bar chart
+category_month_plot <- ggplot(category_month_avg, aes(x = month, y = avg_amount, fill = category)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Month", y = "Average Amount Spent", title = "Average Amount Spent by Category per Month") +
+  theme_minimal()
+
+ggplotly(category_month_plot)
+```
+
+From the chart above we observe that the amount spent on average per category is indeed in the following order with education \< food \< recreation \< shelter. We can also observe some anomalies in March and April. There is an exceeding large expenditure on shelter in march and in April the rent adjustment increased exceptionally as well. The expenditure in shelter may have being transferred to increase rent adjustment.
+
+::: {.callout-note title="Note"}
+Since not everyone in the city is a landlord / tenant. This chart only serve as a benchmark of average city resident.
+:::
+
+## Merged visualization
+
+Now lets see some visualizations after we merge these 2 files together
+
+```{r}
+financial_journal <- finance %>%
+  mutate(date = as.Date(timestamp))
+
+# Aggregate financial data by participantId and category
+agg_financial <- financial_journal %>%
+  group_by(participantId, category) %>%
+  summarize(total_spent = sum(amount), .groups = "drop")
+
+# Merge demographic data with aggregated financial data
+merged_data <- part_info %>%
+  left_join(agg_financial, by = "participantId")
+
+```
+
+wage agaist joviality
+
+```{r}
+# Subset merged_data to only include rows where category is "wage"
+wage_data <- merged_data %>% filter(category == "Wage")
+
+# Create scatterplot of wage vs. joviality
+ggplotly(ggplot(wage_data, aes(x = total_spent, y = joviality)) +
+  geom_smooth() +
+  labs(title = "Wage vs. Joviality", x = "Wage", y = "Joviality")+ geom_point())
+
+```
+
+Using the smooth tend line, we can observe that joviality generally decrease with incrasing wage. This may be because a higher wage may mean more responsibility and hence greater amount of stress which lead to lower joviality
+
+## Non-useful plots that were explored
+
+```{r,fig.height=9}
+
+library(GGally)
+financial_journal <- finance %>%
+  mutate(date = as.Date(timestamp))
+
+# Aggregate financial data by participantId and category
+agg_financial <- financial_journal %>%
+  group_by(participantId, category) %>%
+  summarize(total_spent = sum(amount), .groups = "drop")
+
+# Merge demographic data with aggregated financial data
+merged_data <- part_info %>%
+  left_join(agg_financial, by = "participantId")
+
+# Subset the merged data to only include the relevant variables for our correlation analysis.
+cor_data <- merged_data %>%
+  select(age, educationLevel, householdSize, haveKids, category, total_spent)
+
+#Convert educationLevel to a numeric variable for our correlation analysis, with higher levels of education represented by larger numbers.
+cor_data <- cor_data %>%
+  mutate(educationLevelNum = case_when(
+    educationLevel == "Low" ~ 1,
+    educationLevel == "HighSchoolOrCollege" ~ 2,
+    educationLevel == "Bachelors" ~ 3,
+    educationLevel == "Graduate" ~ 4
+  )) %>%
+  mutate(haveKidsNum = as.integer(haveKids)) %>%
+  select(-educationLevel, -haveKids)
+
+ggpairs(cor_data, columns = c("age", "educationLevelNum", "householdSize", "haveKidsNum", "total_spent"),
+        mapping = aes(color = category),
+        lower = list(continuous = "smooth"), diag = list(continuous = "bar"),
+        upper = list(continuous = wrap("cor", method = "pearson")),
+        title = "Correlation between Demographic Characteristics and Financial Behaviors")
+
+# Create scatterplot of total spent vs. household size
+ggplot(merged_data, aes(x = householdSize, y = total_spent, color = haveKids)) +
+  geom_point() +
+  labs(title = "Total Spent vs. Household Size", x = "Household Size", y = "Total Spent", color = "Have Kids")
+```
+
+```{r}
+
+
+```
