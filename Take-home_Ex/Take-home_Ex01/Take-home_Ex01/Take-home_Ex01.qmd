@@ -1,6 +1,8 @@
 ---
 title: "Take-home_Ex01"
 author: "Wan Xinyu"
+execute: 
+  warning: false
 ---
 
 # 1. The task
@@ -15,7 +17,7 @@ The purpose of this take home exercise is to to reveal the demographic and finan
 pacman::p_load(ggplot2, ggiraph, plotly, 
                patchwork, DT, tidyverse,
                ggrepel, ggthemes, hrbrthemes,
-               tidyverse) 
+               tidyverse,ggstatsplot,pals) 
 ```
 
 The unzipped files have been saved into a new folder named data for better organization.
@@ -55,7 +57,7 @@ Lets first examine the properties of the participants csv file.
 ## Quick peek
 
 ```{r}
-head(part_info)
+datatable(part_info)
 ```
 
 ## Dataset structure
@@ -66,15 +68,24 @@ str(part_info)
 
 ## Summary
 
+Only displaying the meaningful summary
+
 ```{r}
 summary(part_info[, c("householdSize", "haveKids", "age", "educationLevel", "interestGroup", "joviality")])
 
 ```
 
-## Further details on category variable
+## Further examination of categorical variable
+
+Count of resident for each interest group
 
 ```{r}
 table(part_info$interestGroup)
+```
+
+Count of resident for each education level
+
+```{r}
 table(part_info$educationLevel)
 ```
 :::
@@ -91,6 +102,8 @@ sum(is.na(part_info))
 Next we will visualize some variables in document to see if there are any anomalies. From the chart below, we see that there exist no participants with extremely large age or low
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 p1 <- ggplot(part_info, aes(x = age)) +
   geom_bar() +
   labs(title = "Distribution of Participants' Age",
@@ -155,6 +168,15 @@ fig3 <- subplot(fig, fig2, nrows = 1, titleY = TRUE, titleX = TRUE, margin = 0.1
 
 fig3
 ```
+
+## Check for duplicates
+
+```{r}
+duplicates1 <- duplicated(part_info)
+part_info[duplicates1, ]
+```
+
+Since 0 rows are displayed. We can confirm that duplicates do not exist in this csv file.
 :::
 
 Lets move on to examine the properties of the finance csv file.
@@ -168,6 +190,10 @@ Sneak peak of the first few entries in the dataset
 head(finance)
 ```
 
+::: {.callout-warning title="Note"}
+Please do not use datatable here or you will face a error of Fatal javascript OOM in reached Heap Limit which indicate that R studio session has run out of memory while attempting to execute JavaScript code.
+:::
+
 ## Dataset structure
 
 ```{r}
@@ -175,6 +201,8 @@ str(finance)
 ```
 
 ## Summary
+
+Only displaying the meaningful summary
 
 ```{r}
 summary(finance[c("amount")])
@@ -199,7 +227,8 @@ sum(is.na(finance))
 Check for outlier in the amount variable. We first group the amount variables by the category. Then we do a box plot. From the chart we can observe that shelter has some abnormally small values to the negative end and wages has some exceptionally large values on the positive end. We may wish to take note of these in our analysis.
 
 ```{r}
-
+#| code-fold: true
+#| code-summary: "Show the code"
 # Create a box plot of amount by category
 ggplotly(ggplot(finance, aes(x = category, y = amount, fill = category)) +
   geom_boxplot() +
@@ -208,7 +237,102 @@ ggplotly(ggplot(finance, aes(x = category, y = amount, fill = category)) +
   ggtitle("Amount Spent by Expense Category"))
 
 ```
+
+## Check for duplicates
+
+Now lets move to check for duplicates. The code below will display the duplicates in the financial_journal.csv
+
+```{r}
+duplicates <- duplicated(finance)
+finance[duplicates, ]
+```
+
+We will remove these duplicates and resave the file as finance using the following code
+
+```{r}
+finance <- distinct(finance)
+```
+
+Lets just confirm that the duplicates are removed using the following code. The output of the following should be the same.
+
+```{r}
+nrow(finance)
+nrow(distinct(finance))
+```
 :::
+
+::: {.callout-warning title="Note"}
+For better data presentation and consistency, we may encode all expenses into positive instead of negative using the code below. However, we will not do this as we will will analysis rent adjustments which has positive and negative and may cause confusion \# Do NOT RUN
+
+```{r}
+#finance$amount <- abs(finance$amount)
+```
+:::
+
+## Checking for anomalies
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+finance %>%
+  mutate(date = as.Date(timestamp)) %>%
+  group_by(participantId) %>%
+  summarise(num_months = n_distinct(format(date, "%Y-%m"))) %>%
+  datatable()
+
+```
+
+Clicking from the above table, we do realize that most participant id has transaction in all 12 months but some only had transactions in one month. We should remove them as it is likely they are not residents
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+finance %>%
+  mutate(date = as.Date(timestamp)) %>%
+  group_by(participantId) %>%
+  summarise(num_months = n_distinct(format(date, "%Y-%m"))) %>%
+  filter(num_months != max(num_months)) %>%
+  datatable()
+```
+
+We will move on to classify the above as non residents and remove them from the financial journal dataset.
+
+```{r}
+
+# calculate num_months for each participant
+monthly_counts <- finance %>%
+  mutate(date = as.Date(timestamp)) %>%
+  group_by(participantId) %>%
+  summarize(num_months = n_distinct(format(date, "%Y-%m")))
+
+# find participants with num_months different from the maximum num_months
+non_residents <- monthly_counts %>%
+  filter(num_months != max(num_months))
+
+# remove non-residents from the finance data frame
+finance <- finance %>%
+  filter(!participantId %in% non_residents$participantId)
+```
+
+A reduction in rows is observed below indicating removal of 131 residents.
+
+```{r}
+nrow(distinct(finance))
+```
+
+We will also update out participant csv to remove the non residents
+
+```{r}
+# remove non-residents from the finance data frame
+part_info <- part_info %>%
+  filter(!participantId %in% non_residents$participantId)
+```
+
+We can see a reduction in 131 rows as well
+
+```{r}
+nrow(distinct(part_info))
+```
 
 # 3. Data visualization
 
@@ -218,6 +342,8 @@ Exploratory data analysis Lets now take alook at the demographic data provided i
 ## Age
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 # Histogram of age
 v1<- ggplot(part_info, aes(x = age)) +
   geom_bar(binwidth = 5) +
@@ -230,6 +356,8 @@ ggplotly(v1)
 ## Education level
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 # Bar chart of education level
 v2<- ggplot(part_info, aes(x = educationLevel)) +
   geom_bar() +
@@ -242,6 +370,8 @@ ggplotly(v2)
 ## Household size
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 # Pie chart of household size
 v3<- ggplot(part_info, aes(x = householdSize)) +
   geom_bar() +
@@ -254,6 +384,8 @@ ggplotly(v3)
 ## Have kids
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 # Bar chart of whether participants have children
 v4<- ggplot(part_info, aes(x = factor(haveKids))) +
   geom_bar() +
@@ -267,6 +399,8 @@ ggplotly(v4)
 ## Interest group
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 v5 <- ggplot(data = part_info, aes(x = interestGroup)) +
       geom_bar(aes(text = paste("\n","Count: ", ..count.., "\n"," Percentage: ", scales::percent(..count../sum(..count..))))) +
       labs(title = "Interest Group Distribution", x = "Interest Group", y = "Count")
@@ -277,6 +411,8 @@ ggplotly(v5,tooltip = "text")
 ## Joviality
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 v6<- ggplot(part_info, aes(x = joviality)) +
   geom_histogram(binwidth = 0.05, fill = "grey", color = "white") +
   labs(title = "Joviality Distribution", x = "Joviality", y = "Count")
@@ -285,11 +421,13 @@ ggplotly(v6)
 ```
 :::
 
-### 3.1 Exploring hidden patterns between variables in the participants csv
+### 3.1 Exploring participants data
 
-Education vs age
+#### Education vs age
 
 ```{r , fig.height= 9, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
 v7<- ggplot(part_info, aes(x = age, fill = educationLevel)) +
   geom_bar() +
   labs(title = "Relationship between Age and Education Level",
@@ -315,9 +453,11 @@ We do not observe any distinct patterns and relationships between Age and Educat
 ```{r}
 ```
 
-Household size vs have kids
+#### Household size vs have kids
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 ggplot(part_info, aes(x = haveKids, y = householdSize)) +
   geom_jitter() +
   scale_fill_gradient(low = "white", high = "blue") +
@@ -331,9 +471,16 @@ ggplot(part_info, aes(x = haveKids, y = householdSize)) +
 
 From here we can observe a pattern that only household with 3 person have kids while those with 2 do not. Hence provison of subsidies such as milk and diaper vouchers should only be provisioned to family with more than 3 household members
 
-Have kids vs education
+#### Have kids vs education
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+edu_levels <- c("Low", "HighSchoolOrCollege", "Bachelors", "Graduate")
+
+# convert educationLevel column to factor with desired levels
+part_info$educationLevel <- factor(part_info$educationLevel, levels = edu_levels)
 
 # Calculate percentage of each education level group with children
 edu_kids <- part_info %>%
@@ -342,22 +489,22 @@ edu_kids <- part_info %>%
   mutate(percentage = count / sum(count))
 
 # Plot the bar chart
+
 ggplotly(ggplot(edu_kids, aes(x = educationLevel, y = percentage, fill = haveKids)) +
   geom_bar(stat = "identity", position = "dodge") +
   labs(title = "Percentage of Participants with Children by Education Level",
        x = "Education Level",
        y = "Percentage with Children") +
   scale_fill_manual(values = c("#E69F00", "#56B4E9"), labels = c("No", "Yes")))
-
-
-
 ```
 
-From the above we can observe that observe that generally percentage of residents who have kids are generally lower that than percentage of residents who have kids. There seems to be an inverse relationship between education level and if a resident has kids.
+From the above we can observe that observe that generally percentage of residents who have kids are generally lower that than percentage of residents who have kids. There seems to be an inverse relationship between education level and if a resident has kids (with exception to high school).
 
-Next lets explore the mean age for residents who have and do not have kids
+#### Mean age vs having kids
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 tooltip <- function(y, ymax, accuracy = .01) {
   mean <- scales::number(y, accuracy = accuracy)
   sem <- scales::number(ymax - y, accuracy = accuracy)
@@ -384,9 +531,31 @@ girafe(ggobj = gg_point,
        height_svg = 8*0.618)
 ```
 
-From the chart we do not observe any significant difference.
+From the chart we do not observe any significant difference.However we do note that mean age for having kids is around 38 years old which is pretty late.
 
 ```{r}
+ggbetweenstats(
+  data = part_info,
+  x = haveKids,
+  y = age,
+  plot.type = "box",
+  pairwise.comparisons = TRUE,
+  mean.plotting = TRUE,
+   message = TRUE ,
+  xlab = "Having Kids",
+  ylab = "Age"
+)
+
+
+```
+
+At a significance level of 5%, since the p value is greater than 0.05, we cannot reject the null hypothesis that the mean age of resident who have and do not have kids are the same
+
+#### Percentage of Participants in Each Interest Group by Education Level
+
+```{r , fig.height=9}
+#| code-fold: true
+#| code-summary: "Show the code"
 edu_levels <- c("Low", "HighSchoolOrCollege", "Bachelors", "Graduate")
 
 # convert educationLevel column to factor with desired levels
@@ -413,14 +582,16 @@ plotly_plot
 ```
 
 ::: {.callout-note title="Note"}
-define the desired order of the education levels using the edu_levels vector. Then, we convert the educationLevel column to a factor with the desired levels using the factor() function and the levels
+Define the desired order of the education levels using the edu_levels vector. Then, we convert the educationLevel column to a factor with the desired levels using the factor() function and the levels
 :::
 
-No distinct patterns are observed
+There is no distinct patterns observed, activities seems to be quite well spread across residents of different education level
 
-mean joviality vs education
+#### Mean joviality vs education
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 tooltip <- function(y, ymax, accuracy = .01) {
   mean <- scales::number(y, accuracy = accuracy)
   sem <- scales::number(ymax - y, accuracy = accuracy)
@@ -449,9 +620,27 @@ girafe(ggobj = gg_point,
 
 ```
 
-Mean joviality seems to increae with high education level
+We can observe from the above chart that mean joviality increases with the education level.
 
 ```{r}
+ggbetweenstats(
+  data = part_info,
+  x = educationLevel,
+  y = joviality,
+  plot.type = "box",
+  mean.plotting = TRUE,
+  xlab = "Education Level",
+  ylab = "Joviality"
+)
+```
+
+At a significance level of 5%, since the p value is smaller than 0.05, we reject the null hypothesis that the mean joviality of resident with different education are the same.
+
+#### Mean joviality vs household size
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 tooltip <- function(y, ymax, accuracy = .01) {
   mean <- scales::number(y, accuracy = accuracy)
   sem <- scales::number(ymax - y, accuracy = accuracy)
@@ -479,9 +668,27 @@ girafe(ggobj = gg_point,
 
 ```
 
-We observe that mean joviality for single person household is lower than that of 2 and 3 person household.
+We observe that mean joviality for single person household is higher than that of 2 and 3 person household and seems to display an decreasing trend with increasing number of members of the household.
 
 ```{r}
+ggbetweenstats(
+  data = part_info,
+  x = householdSize,
+  y = joviality,
+  plot.type = "box",
+  mean.plotting = TRUE,
+  xlab = "Household Size",
+  ylab = "Joviality"
+)
+```
+
+However, at a significance level of 5%, since the p value is greater than 0.05, we cannot reject the null hypothesis that the mean joviality of residents of different household size are the same.
+
+#### Mean joviality vs have kids
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 tooltip <- function(y, ymax, accuracy = .01) {
   mean <- scales::number(y, accuracy = accuracy)
   sem <- scales::number(ymax - y, accuracy = accuracy)
@@ -515,46 +722,75 @@ girafe(ggobj = gg_point,
 
 ```
 
+Mean joviality is lowest for residents who have kids (3 member household) and this may be due to additional stress of taking care of them.
+
 ```{r}
+ggbetweenstats(
+  data = part_info,
+  x = haveKids,
+  y = joviality,
+  plot.type = "box",
+  pairwise.comparisons = TRUE,
+  mean.plotting = TRUE,
+  xlab = "Having Kids",
+  ylab = "Joviality"
+)
+```
+
+However, at a significance level of 5%, since the p value is greater than 0.05, we cannot reject the null hypothesis that the mean joviality of resident who have and do not have kids are the same.
+
+#### Mean joviality vs age
+
+Lets first plot a graph
+
+```{r}
+# create ggplot object
+p <- ggplot(part_info, aes(x = age, y = joviality)) + 
+  geom_point(alpha = 0.5)
+
+# convert ggplot object to plotly object
+ggplotly(p, tooltip = c("age", "joviality"))
+```
+
+We see that this plot itself is not really meaningful. We will use mean joviality to represent each age group.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 
 # group data by age and calculate mean joviality
-age_joviality <- aggregate(joviality ~ age, part_info, mean)
+age_joviality <- part_info %>% 
+  group_by(age) %>% 
+  summarize(mean_joviality = mean(joviality))
 
-# create plotly plot
-plot_ly(data = age_joviality, x = ~age, y = ~joviality, type = 'scatter', text = ~paste0("Age: ", age, "<br>Joviality: ", joviality)) %>%
-  add_trace(y = ~joviality, x = ~age, type = 'bar', name = 'Mean Joviality', marker = list(color = 'blue', opacity = 0.7)) %>%
-  layout(title = "Relationship between Age and Mean Joviality",
-         xaxis = list(title = "Age"),
-         yaxis = list(title = "Mean Joviality"))
+# create ggplot plot
+ggplotly(ggplot(age_joviality, aes(x = age, y = mean_joviality)) +
+  geom_smooth(method = "lm", se = FALSE) + geom_point() +
+  labs(x = "Age", y = "Mean Joviality") +
+  ggtitle("Relationship between Age and Mean Joviality"))
+
 
 
 ```
 
 From the plot we do not see a distinct trend with age and mean joviality. However,we can observe that resident of age 53 has the lowest mean joviality and resident of age 59 has the highest mean joviality
 
-```{r, fig.height=9}
-
-#REMOVEEE
-# create two data frames for age 53 and 59
-age53_joviality <- subset(part_info, age == 53)
-age59_joviality <- subset(part_info, age == 59)
-
-# create plotly subplot
-
-plot_ly(data = age53_joviality, 
-        x = ~joviality, 
-        type = 'box', 
-        marker = list(color = 'blue', opacity = 0.7), 
-        showlegend = FALSE) %>%
-  layout(title = "Joviality at Age 53",
-         xaxis = list(title = "Joviality"),
-         yaxis = list(title = "Count"))
-
-  
+```{r}
+ggscatterstats(
+  data = age_joviality,
+  x = age,
+  y = mean_joviality,
+  marginal = FALSE,
+  )+labs(x = "Age", y = "Mean Joviality")
 ```
 
+At a significance level of 5%, since the p value is greater than 0.05, we cannot reject the null hypothesis that the mean joviality of resident is different across age group
+
+##### Further examination
+
 ```{r, fig.height=9,fig.width=15}
-library(plotly)
+#| code-fold: true
+#| code-summary: "Show the code"
 
 # Add a column to indicate outliers using IQR method
 is_outlier <- function(x) {
@@ -581,9 +817,6 @@ plot53 <- ggplot(data = age53_joviality, aes(x = 1, y = joviality)) +
 
 # Convert ggplot object to plotly
 plotly_object <- ggplotly(plot53)
-
-# Print plotly object
-plotly_object
 
 
 # Create data subset for age 59
@@ -638,10 +871,13 @@ subplot(plot53, plot59, nrows = 1, titleY = TRUE, titleX = TRUE, margin = 0.1 ) 
 
 ```
 
-We can observe that joviality for age 53 residents are more concentrated to below 0.5 while joviality for age 59 residents are more evenly distributed across the axis. This confirms our expectation that age 53 residents may indeed be generally not joval while for age 59 residents, there is no general consensus observed and all holds their own opinion
+We can observe that joviality for age 53 residents are more concentrated to below 0.5 while joviality for age 59 residents are more evenly distributed across the axis. This confirms our expectation that age 53 residents may indeed be generally not jovial while for age 59 residents, there is no general concentration of joviality observed.
+
+#### Mean Joviality vs Interest group
 
 ```{r}
-library(ggplot2)
+#| code-fold: true
+#| code-summary: "Show the code"
 
 # Aggregate joviality by interest group
 joviality_interest <- aggregate(joviality ~ interestGroup, data = part_info, mean)
@@ -656,13 +892,33 @@ ggplot(data = joviality_interest, aes(x = interestGroup, y = joviality)) +
 
 Interest group E provides the highest mean joviality. If officials are looking to improve joviality among residents, they can look into actions such as subsidizing group E membership, etc.
 
+```{r}
+ggbetweenstats(
+  data = part_info,
+  x = interestGroup,
+  y = joviality,
+  plot.type = "box",
+  mean.plotting = TRUE,
+  xlab = "Interest Group",
+  ylab = "Joviality")+
+  scale_color_brewer(palette = "Set3")
+```
+
+At a significance level of 5%, since the p value is greater than 0.05, we cannot reject the null hypothesis that the mean joviality of resident who participate in different interest groups are the same.
+
+::: {.callout-note title="Note"}
+We use scale_color_brewer() as default palette only has 8 colors. We can define out own colors as well to be used in palette
+:::
+
 ## 3.2 Exploring financial data
 
 Next we move on to explore variables in the financial data. Since every participant can have multiple entries. We will explore the data by grouping the entries according the participant's Id and the category
 
-Lets first take a look at the sum residents expenditure by category
+#### Sum of residents expenditure by category
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 
 # Aggregate financial data by participant
 financial_data_agg <- finance %>%
@@ -684,7 +940,11 @@ ggplotly(expenses_plot)
 
 In the chart above we realize wage is counted as part of expenditure We will remove wage since it is not exactly an expense that we will be looking at.
 
+#### Expenses by category (removing wage)
+
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 # Aggregate financial data by participant
 financial_data_agg <- finance %>%
    filter(category != "Wage") %>%
@@ -706,7 +966,36 @@ ggplotly(expenses_plot1)
 
 From the chart above we realize that shelter accounts for the main category for expenditure. This is followed by recreation, food and education. Rent adjustment is on the negative end which may be a indication that the landlord in the city has overall lowered their rents.
 
+Next we will examine the wages over the months across the time stamp period.
+
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Convert the timestamp column to a datetime object
+finance$timestamp <- as.POSIXct(finance$timestamp)
+
+# Create a line chart of wages per month
+wages_per_month <- finance %>%
+  filter(category == "Wage") %>%
+  group_by(month = floor_date(timestamp, "month")) %>%
+  summarize(total_wages = sum(amount)) %>%
+  ggplot(aes(x = month, y = total_wages)) +
+  geom_line() +
+  labs(x = "Month", y = "Total Wages", title = "Total Wages per Month") +
+  scale_x_datetime(date_labels = "%b %Y")
+
+# Display the plot
+print(wages_per_month)
+```
+
+From the above chart we do realize that in March, total wage is abnormally high. This may be an anomaly that that may require further information to examine. For now, we will retain it as it is.
+
+#### Average Amount by Category over Time
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 # Aggregate financial data by category and timestamp
 financial_data_agg <- finance %>%
   filter(category != "Wage") %>%
@@ -723,13 +1012,17 @@ line_chart <- ggplot(financial_data_agg, aes(x = timestamp, y = avg_amount, colo
 ggplotly(line_chart)
 ```
 
-From the above chart, we observe that mapping average amount for category by days in the time stamp is not visually pleasing to see any patterns. But still if we zoom in, we can get som info from it. That is we can see that there are some major fluctuation in shelter amount and rent adjustment in march and April. Education amount is incurred on first day of the month and that if we zoom in. We can see that recreation and food demonstrates a regular pattern as shown in the pic below
+From the above chart, we observe that mapping average amount for category by days in the time stamp is not visually pleasing to see any patterns. But still if we zoom in, we can get some info from it. That is we can see that there are some major fluctuation in shelter amount and rent adjustment in march and April. Education amount is incurred on first day of the month and that if we zoom in. We can see that recreation and food demonstrates a regular pattern as shown in the pic below
 
-\[\]recreation and food.png
+![](newplot123.png)
 
 Lets try to map above information in terms of months
 
-```{r, fig.height=9}
+#### Average Amount Spent by Category per Month
+
+```{r, fig.height=9, fig.width= 15}
+#| code-fold: true
+#| code-summary: "Show the code"
 # Extract month from timestamp
 financial_data_agg <- finance %>%
   filter(category != "Wage") %>%
@@ -746,22 +1039,30 @@ category_month_avg <- financial_data_agg %>%
 category_month_plot <- ggplot(category_month_avg, aes(x = month, y = avg_amount, fill = category)) +
   geom_bar(stat = "identity", position = "dodge") +
   labs(x = "Month", y = "Average Amount Spent", title = "Average Amount Spent by Category per Month") +
-  theme_minimal()
+  theme(axis.text.x = element_text(angle = 45,
+                                   vjust = 0.5,
+                                   hjust = 0.5))
 
 ggplotly(category_month_plot)
 ```
 
-From the chart above we observe that the amount spent on average per category is indeed in the following order with education \< food \< recreation \< shelter. We can also observe some anomalies in March and April. There is an exceeding large expenditure on shelter in march and in April the rent adjustment increased exceptionally as well. The expenditure in shelter may have being transferred to increase rent adjustment.
+::: {.callout-note title="Note"}
+Using theme minimal will result in overlapping of x-axis. I use theme here so that angle of x-axis label can be adjusted 45 degrees
+:::
+
+From the chart above we observe that the amount spent on average per category is indeed in the following order with education \< food \< recreation \< shelter. We can also observe some anomalies in March and April. There is an exceeding large expenditure on shelter and recreation in march and in April the rent adjustment increased exceptionally as well. The expenditure in shelter may have being transferred to increase rent adjustment.
 
 ::: {.callout-note title="Note"}
 Since not everyone in the city is a landlord / tenant. This chart only serve as a benchmark of average city resident.
 :::
 
-## Merged visualization
+## 3.3 Merged visualization
 
-Now lets see some visualizations after we merge these 2 files together
+Now lets see some visualizations after we merge these 2 files together using the code below
 
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 financial_journal <- finance %>%
   mutate(date = as.Date(timestamp))
 
@@ -776,9 +1077,20 @@ merged_data <- part_info %>%
 
 ```
 
-wage agaist joviality
+We can see the residents' total expenditures in each category and their respective wage using the below code.
 
 ```{r}
+DT::datatable(merged_data[, c("participantId", "category", "total_spent")], class = 'compact')
+
+```
+
+Lets move on to see some EDAs
+
+### Wage agaist joviality
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 # Subset merged_data to only include rows where category is "wage"
 wage_data <- merged_data %>% filter(category == "Wage")
 
@@ -789,53 +1101,163 @@ ggplotly(ggplot(wage_data, aes(x = total_spent, y = joviality)) +
 
 ```
 
-Using the smooth tend line, we can observe that joviality generally decrease with incrasing wage. This may be because a higher wage may mean more responsibility and hence greater amount of stress which lead to lower joviality
+Using the smooth tend line, we can observe that joviality generally decrease with increasing wage. This may be because a higher wage may mean more responsibility at work and hence greater amount of stress which lead to lower joviality
 
-## Non-useful plots that were explored
+```{r}
+ggscatterstats(
+  data = wage_data,
+  x = total_spent,
+  y = joviality,
+  marginal = FALSE,
+  ) + labs(x = "Wage", y = "Joviality")
+```
 
-```{r,fig.height=9}
+At 5% significance level, since the p value is smaller than 0.05, we reject the null hypothesis that there is no correlation between joviality and wage
 
-library(GGally)
-financial_journal <- finance %>%
-  mutate(date = as.Date(timestamp))
+#### Wage against education
 
-# Aggregate financial data by participantId and category
-agg_financial <- financial_journal %>%
-  group_by(participantId, category) %>%
-  summarize(total_spent = sum(amount), .groups = "drop")
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 
-# Merge demographic data with aggregated financial data
-merged_data <- part_info %>%
-  left_join(agg_financial, by = "participantId")
+wage_data <- merged_data %>% filter(category == "Wage")
 
-# Subset the merged data to only include the relevant variables for our correlation analysis.
-cor_data <- merged_data %>%
-  select(age, educationLevel, householdSize, haveKids, category, total_spent)
-
-#Convert educationLevel to a numeric variable for our correlation analysis, with higher levels of education represented by larger numbers.
-cor_data <- cor_data %>%
-  mutate(educationLevelNum = case_when(
-    educationLevel == "Low" ~ 1,
-    educationLevel == "HighSchoolOrCollege" ~ 2,
-    educationLevel == "Bachelors" ~ 3,
-    educationLevel == "Graduate" ~ 4
-  )) %>%
-  mutate(haveKidsNum = as.integer(haveKids)) %>%
-  select(-educationLevel, -haveKids)
-
-ggpairs(cor_data, columns = c("age", "educationLevelNum", "householdSize", "haveKidsNum", "total_spent"),
-        mapping = aes(color = category),
-        lower = list(continuous = "smooth"), diag = list(continuous = "bar"),
-        upper = list(continuous = wrap("cor", method = "pearson")),
-        title = "Correlation between Demographic Characteristics and Financial Behaviors")
-
-# Create scatterplot of total spent vs. household size
-ggplot(merged_data, aes(x = householdSize, y = total_spent, color = haveKids)) +
+ggplot(wage_data, aes(x = educationLevel, y = total_spent)) +
   geom_point() +
-  labs(title = "Total Spent vs. Household Size", x = "Household Size", y = "Total Spent", color = "Have Kids")
+  geom_boxplot(alpha = 0.5, width = 0.2, outlier.size = 1) +
+  labs(x = "Education Level", y = "Wage")
+
+
+```
+
+From the chart above we can observe increasing education level of residents has increasing level of wage
+
+#### Wage against interest group
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+wage_data <- merged_data %>% filter(category == "Wage")
+
+ggplot(wage_data, aes(x = interestGroup, y = total_spent)) +
+  geom_point(alpha = 0.5, width = 0.2) +
+  geom_boxplot(alpha = 0.5, width = 0.2, outlier.size = 1) +
+  labs(x = "Interest Group", y = "Wage")
+```
+
+From the above chart, wage distribution across interest group seems to be well spread. But Interest group I seems to have attracted on one of the hugest wage resident in the city.
+
+Lets check for the correlations
+
+```{r}
+pacman::p_load(readxl, performance, parameters, see)
+```
+
+```{r, fig.height=9}
+model <- lm(total_spent ~ interestGroup + educationLevel, data = wage_data)
+model
 ```
 
 ```{r}
+check_collinearity(model)
+```
 
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+check_c <- check_collinearity(model)
+plot(check_c)
+```
+
+#### Percentage of spending within each category for each group
+
+```{r, fig.height=9}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+spending_by_kids <- merged_data %>%
+  filter(category != "Wage") %>%
+  group_by(haveKids, category) %>%
+  summarise(total_spending = sum(total_spent)) %>%
+  mutate(percentage = total_spending/sum(total_spending)*100)
+
+# Convert haveKids to a factor for easier plotting
+spending_by_kids$haveKids <- as.factor(spending_by_kids$haveKids)
+
+# Plot using ggplot2 and ggplotly
+spending_by_kids_plot <- ggplot(spending_by_kids, aes(x = haveKids, y = percentage, fill = category)) +
+  geom_bar(position = "stack", stat = "identity") +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+  labs(title = "Percentage of Spending by Category and Household Type",
+       x = "Household Type",
+       y = "Percentage of Spending") +
+  guides(fill = guide_legend(title = "Spending Category"))
+
+ggplotly(spending_by_kids_plot)
 
 ```
+
+We can observe that those who do not spend on education at all while household which do have kids has greater spending on shelter and food and lower on recreation.
+
+#### Spending category by education level
+
+```{r, fig.height=9}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+spending_data <- merged_data %>% filter(category != "Wage")
+
+ggplot(spending_data, aes(x = category, y = total_spent, fill = category)) +
+  geom_col(position = "dodge") +
+  facet_wrap(~educationLevel, ncol = 2) +
+  scale_fill_discrete(name = "Spending Category") +
+  labs(x = "Spending Category", y = "Amount")
+```
+
+From the chart we can observe that, with the exception of rent adjustment, spending pattern by category across different education level is generally the same.
+
+#### Recreation spending vs joviality
+
+```{r}
+recreation_data <- merged_data %>%
+  filter(category == "Recreation")
+
+# Create scatter plot of joviality vs recreation spending
+ggplot(recreation_data, aes(x = total_spent, y = joviality)) +
+  geom_smooth() +
+  labs(x = "Recreation Spending", y = "Joviality") + geom_point()
+```
+
+From the observation it seems that increasing spending would increase joviality until a saturation is reached at around \$10000. Note that the chart is plotted on a negative x-axis as spending is accounted for as negative value.
+
+```{r}
+ggscatterstats(
+  data = recreation_data,
+  x = total_spent,
+  y = joviality,
+  marginal = FALSE,
+  ) + labs(x = "Recreation", y = "Joviality")
+```
+
+At 5% significance level, since the p value is smaller than 0.05, we reject the null hypothesis that there is no correlation between joviality and recreation expenses
+
+## Conclusion
+
+In conclusion, I believe that the authority there are a few points in which the authorities can look at when allocating the grant.
+
+-   Greater funds should be channeled to support the education of residents given that it is the lowest expenditure. Currently education is only observed in residents who has kids and I assume that this expenditure is on the kids only. Perhaps the authorities can look at sponsoring adults continuous learning as well.
+
+-   Mean joviality increases with increase increasing education and that this may be a reason to further support fundings for education purposes.
+
+-   Joviality has an inverse relationship with wage and the manpower authority should perhaps examine the current laws and manpower landscape to determine if employees are properly treated in workplace
+
+-   The mean age of residents having kids is 38 and the percentage of residents who have kids decreases as their education level increase. Targeted family development measures should be put in place if authorities seeks to reduce this age and encourage fertility rate among certain education group level
+
+-   Shelter accounts for the largest expenditure in the category and residents who have kids spends on a larger percentage for shelter. Since shelter is a fundamental necessity, the authorities can perhaps consider rental subsidies and support for qualified residents.
+
+-   Increasing recreation expenses improves joviality to a certain extent. If the city want to improve the happiness of the residents, perhaps they can consider measures such as free tours to parks,etc
+
+To sum up, I have examined some variables and their correlation to each another. I have also provided some areas in which the authority can look at to disburse their city renewal grant and revitalize the community. However, as correlation does not equal causation, the above only serves as a reference to which the authority can look at. Further examination with more in dept data are required to understand the community and solve the problems more efficiently .
