@@ -1,6 +1,8 @@
 ---
 title: "In-class_Ex05"
 author: "Wan Xinyu"
+execute: 
+  warning: false
 ---
 
 ```{r}
