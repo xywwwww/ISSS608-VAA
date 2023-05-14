@@ -243,6 +243,7 @@ For better data presentation and consistency, we may encode all expenses into po
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# create a datatable of participant ID and number of months they made transaction in
 finance %>%
   mutate(date = as.Date(timestamp)) %>%
   group_by(participantId) %>%
@@ -292,6 +293,7 @@ finance <- finance %>%
 A reduction in rows is observed below indicating removal of 131 residents.
 
 ```{r}
+# Get number of rows for finance data
 nrow(distinct(finance))
 ```
 
@@ -308,6 +310,7 @@ part_info <- part_info %>%
 We can see a reduction in 131 rows as well
 
 ```{r}
+# Get number of rows for participant data
 nrow(distinct(part_info))
 ```
 
@@ -378,6 +381,7 @@ ggplotly(v4)
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Bar chart of interest group distribution
 v5 <- ggplot(data = part_info, aes(x = interestGroup)) +
       geom_bar(aes(text = paste("\n","Count: ", ..count.., "\n"," Percentage: ", scales::percent(..count../sum(..count..))))) +
       labs(title = "Interest Group Distribution", x = "Interest Group", y = "Count")
@@ -390,6 +394,7 @@ ggplotly(v5,tooltip = "text")
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Histogram of joviality distribution
 v6<- ggplot(part_info, aes(x = joviality)) +
   geom_histogram(binwidth = 0.05, fill = "grey", color = "white") +
   labs(title = "Joviality Distribution", x = "Joviality", y = "Count")
@@ -415,8 +420,9 @@ v8<- ggplot(part_info, aes(x = age)) +
   labs(title = "Age Distribution by Education Level",
        x = "Age (years)",
        y = "Count") +
-  facet_wrap(~ educationLevel, ncol = 2)
+  facet_wrap(~ educationLevel, ncol = 2) #wrapping the 4 charts together into 1
 
+# Combining the 2 charts together for display
 v7 + v8
 
 ```
@@ -432,6 +438,7 @@ Added fig.height to make sure that the charts are not overly compressed
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Creating a jitter plot for household size and whether residents have children
 ggplot(part_info, aes(x = haveKids, y = householdSize)) +
   geom_jitter() +
   scale_fill_gradient(low = "white", high = "blue") +
@@ -481,18 +488,19 @@ We specify the desired order of the education levels using the edu_levels vector
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Define a function to create a tooltip with information about the mean and standard error of a y-value
 tooltip <- function(y, ymax, accuracy = .01) {
-  mean <- scales::number(y, accuracy = accuracy)
+  mean <- scales::number(y, accuracy = accuracy)# Calculate the mean and standard error of the y-value and format them as strings
   sem <- scales::number(ymax - y, accuracy = accuracy)
-  paste("Mean age:", mean, "+/-", sem)
+  paste("Mean age:", mean, "+/-", sem)# Create a string that combines the mean and standard error
 }
-
+# Create a ggplot object with part_info as the data and haveKids as the x-variable
 gg_point <- ggplot(data=part_info, 
                    aes(x = haveKids),
 ) +
   stat_summary(aes(y = age, 
                    tooltip = after_stat(  
-                     tooltip(y, ymax))),  
+                     tooltip(y, ymax))),# Add a summary statistic of the mean and standard error of age for each value of haveKids  
     fun.data = "mean_se", 
     geom = GeomInteractiveCol,  
     fill = "light blue"
@@ -500,8 +508,9 @@ gg_point <- ggplot(data=part_info,
   stat_summary(aes(y = age),
     fun.data = mean_se,
     geom = "errorbar", width = 0.2, size = 0.2
-  )
+  ) # Add error bars showing the standard error of the mean for each value of haveKids
 
+# Create an interactive plot using girafe with gg_point as the input and a specified width and height
 girafe(ggobj = gg_point,
        width_svg = 8,
        height_svg = 8*0.618)
@@ -514,6 +523,7 @@ Let's perform a statistical test to determine if there is a difference in the me
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Create a plot with ggbetweenstats that displays the distribution of age for each value of haveKids
 ggbetweenstats(
   data = part_info,
   x = haveKids,
@@ -536,15 +546,19 @@ At a significance level of 5%, since the p value is greater than 0.05, we cannot
 ```{r , fig.height=9}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Define a character vector of education levels
 edu_levels <- c("Low", "HighSchoolOrCollege", "Bachelors", "Graduate")
 
+# Convert the "educationLevel" variable in the "part_info" data frame to a factor variable and specify the order of the levels
 part_info$educationLevel <- factor(part_info$educationLevel, levels = edu_levels)
 
+# Group the "part_info" data frame by education level and interest group, count the number of participants in each group, and calculate the percentage of participants in each group
 grouped_data <- part_info %>%
   group_by(educationLevel, interestGroup) %>%
   summarise(count = n()) %>%
   mutate(percentage = prop.table(count) * 100)
 
+# Create a bar plot with ggplot that shows the percentage of participants in each interest group by education level
 plot <- ggplot(grouped_data, aes(x = educationLevel, y = percentage, fill = interestGroup)) +
   geom_col(position = "dodge") +
   labs(title = "Percentage of Participants in Each Interest Group by Education Level",
@@ -553,8 +567,9 @@ plot <- ggplot(grouped_data, aes(x = educationLevel, y = percentage, fill = inte
   scale_fill_brewer(palette = "Set3") +
   theme()
 
-plotly_plot <- ggplotly(plot)
-plotly_plot
+# Making the plot interactive
+ggplotly(plot)
+
 
 ```
 
@@ -565,12 +580,13 @@ From the above chart, we observe that interest group I has exceptionally high pe
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# creates a string that displays the mean joviality score along with the standard error.
 tooltip <- function(y, ymax, accuracy = .01) {
   mean <- scales::number(y, accuracy = accuracy)
   sem <- scales::number(ymax - y, accuracy = accuracy)
   paste("Mean jovility:", mean, "+/-", sem)
 }
-
+# Create a ggplot, where the x-axis represents education level and the y-axis represents joviality score.
 gg_point <- ggplot(data=part_info, 
                    aes(x = educationLevel),
 ) +
@@ -584,8 +600,8 @@ gg_point <- ggplot(data=part_info,
   stat_summary(aes(y = joviality),
     fun.data = mean_se,
     geom = "errorbar", width = 0.2, size = 0.2
-  )
-
+  )# Add the mean and standard error to the plot
+# Create a interactive plot
 girafe(ggobj = gg_point,
        width_svg = 8,
        height_svg = 8*0.618)
@@ -595,11 +611,12 @@ girafe(ggobj = gg_point,
 
 We can observe from the above chart that mean joviality increases with increasing education level.
 
-Let's perform a statistical test to determine if there is a difference in the mean jovialaity
+Let's perform a statistical test to determine if there is a difference in the mean joviality
 
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Create the plot of joviality against education level 
 ggbetweenstats(
   data = part_info,
   x = educationLevel,
@@ -618,6 +635,7 @@ At a significance level of 5%, since the p value is smaller than 0.05, we reject
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# create a tooltip that shows the mean joviality value and standard error of the mean for each point on the plot
 tooltip <- function(y, ymax, accuracy = .01) {
   mean <- scales::number(y, accuracy = accuracy)
   sem <- scales::number(ymax - y, accuracy = accuracy)
@@ -637,8 +655,9 @@ gg_point <- ggplot(data=part_info,
   stat_summary(aes(y = joviality),
     fun.data = mean_se,
     geom = "errorbar", width = 0.2, size = 0.2
-  )
+  )#Add both points and error bars to the plot 
 
+# Create interactive graph
 girafe(ggobj = gg_point,
        width_svg = 8,
        height_svg = 8*0.618)
@@ -652,6 +671,8 @@ Let's perform a statistical test to determine if there is a difference in the me
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+
+# Create the plot of joviality against household size
 ggbetweenstats(
   data = part_info,
   x = householdSize,
@@ -670,6 +691,7 @@ However, at a significance level of 5%, since the p value is greater than 0.05, 
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# calculate the mean and standard error of the mean.Gets the unique values of the haveKids column and  include in the tooltip.
 tooltip <- function(y, ymax, accuracy = .01) {
   mean <- scales::number(y, accuracy = accuracy)
   sem <- scales::number(ymax - y, accuracy = accuracy)
@@ -681,6 +703,7 @@ tooltip <- function(y, ymax, accuracy = .01) {
 gg_point <- ggplot(data=part_info, 
                    aes(x = haveKids),
 ) +
+#Calculate the mean and standard error of the mean for each group of participants who do or do not have kids. 
   stat_summary(aes(y = joviality, 
                    tooltip = after_stat(  
                      tooltip(y, ymax))),  
@@ -690,12 +713,13 @@ gg_point <- ggplot(data=part_info,
   ) +
   stat_summary(aes(y = joviality),
     fun.data = mean_se,
-    geom = "errorbar", width = 0.2, size = 0.2
+    geom = "errorbar", width = 0.2, size = 0.2 
   ) +
   labs(
        x = "Have Kids",
        y = "Joviality")
 
+# Creates the interative plot
 girafe(ggobj = gg_point,
        width_svg = 8,
        height_svg = 8*0.618)
@@ -710,6 +734,7 @@ Let's perform a statistical test to determine if there is a difference in the me
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Creates a plot of joviality against if resident have kids
 ggbetweenstats(
   data = part_info,
   x = haveKids,
@@ -729,25 +754,27 @@ At a significance level of 5%, since the p value is greater than 0.05, we cannot
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
-
+# calculates the mean joviality for each age group , creates a new data frame called age_joviality 
 age_joviality <- part_info %>% 
   group_by(age) %>% 
   summarize(mean_joviality = mean(joviality))
-
+# Creates a interactive plot
 ggplotly(ggplot(age_joviality, aes(x = age, y = mean_joviality)) +
-  geom_smooth(method = "lm", se = FALSE) + geom_point() +
+  geom_smooth(method = "lm", se = FALSE) # Adds linear regression line
+  + geom_point() +
   labs(x = "Age", y = "Mean Joviality") +
   ggtitle("Mean Joviality against Age"))
 
 ```
 
-From the point plot alone, we do not see a distinct trend with age and mean joviality except that resident of age 53 has the lowest mean joviality and resident of age 59 has the highest mean joviality. When we overlay a smoothed line plot, we can see that mean joviality decreases with increasing age.
+From the point plot alone, we do not see a distinct trend with age and mean joviality except that resident of age 53 has the lowest mean joviality and resident of age 59 has the highest mean joviality. When we overlay a smoothed linear plot, we can see that mean joviality decreases with increasing age.
 
 Let's perform a statistical test to determine if there is a difference in the mean joviality
 
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Creates a plot of mean joviality against age using the age_joviality dataframe above
 ggscatterstats(
   data = age_joviality,
   x = age,
@@ -868,6 +895,7 @@ Let's perform a statistical test to determine if there is a difference in the me
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Creates a plot of joviality against interest group
 ggbetweenstats(
   data = part_info,
   x = interestGroup,
@@ -910,6 +938,7 @@ expenses_plot <- ggplot(expenses_summary, aes(x = category, y = total)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(x = "Expense Category", y = "Total Amount Spent", title = "Expenses by Category") +
   theme_minimal()
+# Creates the interactivity 
 ggplotly(expenses_plot)
 ```
 
@@ -936,6 +965,7 @@ expenses_plot1 <- ggplot(expenses_summary, aes(x = category, y = total)) +
   geom_bar(stat = "identity", fill = "steelblue") +
   labs(x = "Expense Category", y = "Total Amount Spent", title = "Expenses by Category") +
   theme_minimal()
+# Creates the interactivity
 ggplotly(expenses_plot1)
 ```
 
@@ -1071,7 +1101,7 @@ Lets move on to see some EDAs
 #| code-summary: "Show the code"
 # Subset merged_data to only include rows where category is "wage"
 wage_data <- merged_data %>% filter(category == "Wage")
-
+# Creates the interactive plot
 ggplotly(ggplot(wage_data, aes(x = total_spent, y = joviality)) +
   geom_smooth() +
   labs(title = "Wage vs. Joviality", x = "Wage", y = "Joviality")+ geom_point())
@@ -1085,6 +1115,7 @@ Let's perform a statistical test to determine if there is a correlation between 
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Creates a plot of joviality against wage
 ggscatterstats(
   data = wage_data,
   x = total_spent,
@@ -1100,9 +1131,7 @@ At 5% significance level, since the p value is smaller than 0.05, we reject the 
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
-
-wage_data <- merged_data %>% filter(category == "Wage")
-
+# Creates a plot wage against education level using "wage_data" defined above
 ggplot(wage_data, aes(x = educationLevel, y = total_spent)) +
   geom_point() +
   geom_boxplot(alpha = 0.5, width = 0.2, outlier.size = 1) +
@@ -1119,10 +1148,9 @@ From the chart above we can observe increasing education level of residents has 
 #| code-fold: true
 #| code-summary: "Show the code"
 
-wage_data <- merged_data %>% filter(category == "Wage")
-
+# Creates a plot of wage across interest group using the "wage_data" defined above
 ggplot(wage_data, aes(x = interestGroup, y = total_spent)) +
-  geom_point(alpha = 0.5, width = 0.2) +
+  geom_point(alpha = 0.5) +
   geom_boxplot(alpha = 0.5, width = 0.2, outlier.size = 1) +
   labs(x = "Interest Group", y = "Wage")
 ```
@@ -1132,11 +1160,13 @@ From the above chart, wage distribution across interest group seems to be well s
 Let's perform a statistical test to determine if there is a correlation between joviality and wage
 
 ```{r, fig.height=9}
+# Construct a linear regression model to the wage_data using lm() function.The dependent variable is total_spent, and the independent variables are interestGroup and educationLevel.
 model <- lm(total_spent ~ interestGroup + educationLevel, data = wage_data)
 model
 ```
 
 ```{r}
+# Uisng check_collinearity from the performance package to check regression model for multicollinearity by calculating the variance inflation factor (VIF)
 check_collinearity(model)
 ```
 
@@ -1145,7 +1175,9 @@ check_collinearity(model)
 #| code-summary: "Show the code"
 
 check_c <- check_collinearity(model)
+# Plots the chart of VIF against education level and interest group
 plot(check_c)
+
 ```
 
 From the results, we can determine that there is a low correlation between education level and interest group attended against wage
@@ -1156,6 +1188,7 @@ From the results, we can determine that there is a low correlation between educa
 #| code-fold: true
 #| code-summary: "Show the code"
 
+# Calculates the total spending by spending category and household type, excluding the "Wage", and calculates the percentage of total spending for each group. This data frame is then save into "spending_by_kids"
 spending_by_kids <- merged_data %>%
   filter(category != "Wage") %>%
   group_by(haveKids, category) %>%
@@ -1165,6 +1198,7 @@ spending_by_kids <- merged_data %>%
 # Convert haveKids to a factor for easier plotting
 spending_by_kids$haveKids <- as.factor(spending_by_kids$haveKids)
 
+# Saving the plot to "spending_by_kids_plot"
 spending_by_kids_plot <- ggplot(spending_by_kids, aes(x = haveKids, y = percentage, fill = category)) +
   geom_bar(position = "stack", stat = "identity") +
   scale_fill_viridis_d() +
@@ -1174,6 +1208,7 @@ spending_by_kids_plot <- ggplot(spending_by_kids, aes(x = haveKids, y = percenta
        y = "Percentage of Spending") +
   guides(fill = guide_legend(title = "Spending Category"))
 
+# Display plot
 ggplotly(spending_by_kids_plot)
 
 ```
@@ -1186,11 +1221,13 @@ We can observe that those who do not spend on education at all have no kids whil
 #| code-fold: true
 #| code-summary: "Show the code"
 
+# Removes wage from merged_data and saves new data frame as spending_data
 spending_data <- merged_data %>% filter(category != "Wage")
 
+# Create the plot of spending category against education level
 ggplot(spending_data, aes(x = category, y = total_spent, fill = category)) +
   geom_col(position = "dodge") +
-  facet_wrap(~educationLevel, ncol = 2) +
+  facet_wrap(~educationLevel, ncol = 2) + # Wrap the 4 charts of different education into 1
   scale_fill_discrete(name = "Spending Category") +
   labs(x = "Spending Category", y = "Amount")
 ```
@@ -1202,6 +1239,7 @@ From the chart we can observe that, with the exception of rent adjustment, spend
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Keeping only entry with recreation as category in merged_data and save the new data frame as recreation_data
 recreation_data <- merged_data %>%
   filter(category == "Recreation")
 
@@ -1218,6 +1256,7 @@ Let's perform a statistical test to determine if there is a correlation bewteen 
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
+# Creates a plot of joviality against recreation spending
 ggscatterstats(
   data = recreation_data,
   x = total_spent,
