@@ -43,7 +43,7 @@ format:
     theme:
       light: flatly
       dark: darkly
-    mainfont: cursive
+    mainfont: serif
     css: styles.css
     toc: true
 
