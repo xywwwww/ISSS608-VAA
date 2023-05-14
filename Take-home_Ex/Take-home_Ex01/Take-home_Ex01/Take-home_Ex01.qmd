@@ -1228,7 +1228,7 @@ ggscatterstats(
 
 At 5% significance level, since the p value is smaller than 0.05, we reject the null hypothesis that there is no correlation between joviality and recreation expenses
 
-## 4 Conclusion
+# 4 Conclusion
 
 In conclusion, I believe that the authority there are a few points in which the they can look at when allocating the grant.
 
