@@ -4,6 +4,7 @@ project:
 website:
   title: "ISSS608-VAA"
   navbar:
+    logo: "research.png"
     left:
     - text: "Hands-on Exercise"
       menu:
@@ -37,11 +38,11 @@ website:
       - href: index.qmd
         text: Home
       - about.qmd
-
+  favicon: "research.png"
 format:
   html:
     theme:
-      light: flatly
+      light: zephyr
       dark: darkly
     mainfont: serif
     css: styles.css

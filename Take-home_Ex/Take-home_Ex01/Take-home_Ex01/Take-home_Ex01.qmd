@@ -20,35 +20,36 @@ pacman::p_load(ggplot2, ggiraph, plotly,
                tidyverse,ggstatsplot,pals,readxl, 
                performance, parameters, see) 
 ```
-ggplot2: A data visualization package for creating graphics in R. It provides a flexible and powerful framework for creating elegant and complex graphs. Documentation: https://ggplot2.tidyverse.org/
 
-ggiraph: An extension to ggplot2 that allows you to add interactivity to your ggplot2 graphics. It provides a set of functions that enable you to create interactive tooltips and clickable regions on your plots. Documentation: https://davidgohel.github.io/ggiraph/index.html
+ggplot2: A data visualization package for creating graphics in R. It provides a flexible and powerful framework for creating elegant and complex graphs. Documentation: <https://ggplot2.tidyverse.org/>
 
-plotly: A data visualization package that allows you to create interactive, web-based plots in R. It provides a wide range of chart types, including scatter plots, line charts, and heatmaps. Documentation: https://plotly.com/r/
+ggiraph: An extension to ggplot2 that allows you to add interactivity to your ggplot2 graphics. It provides a set of functions that enable you to create interactive tooltips and clickable regions on your plots. Documentation: <https://davidgohel.github.io/ggiraph/index.html>
 
-patchwork: A package for combining multiple ggplots into a single plot. It provides a flexible and powerful framework for arranging, annotating, and styling your plots. Documentation: https://patchwork.data-imaginist.com/
+plotly: A data visualization package that allows you to create interactive, web-based plots in R. It provides a wide range of chart types, including scatter plots, line charts, and heatmaps. Documentation: <https://plotly.com/r/>
 
-DT: A package for creating interactive data tables in R. It provides a wide range of features, including sorting, filtering, and pagination. Documentation: https://rstudio.github.io/DT/
+patchwork: A package for combining multiple ggplots into a single plot. It provides a flexible and powerful framework for arranging, annotating, and styling your plots. Documentation: <https://patchwork.data-imaginist.com/>
 
-tidyverse: A collection of packages for data manipulation and visualization in R. It provides a consistent set of tools for working with data, including data cleaning, transformation, and visualization. Documentation: https://www.tidyverse.org/
+DT: A package for creating interactive data tables in R. It provides a wide range of features, including sorting, filtering, and pagination. Documentation: <https://rstudio.github.io/DT/>
 
-ggrepel: A package for avoiding overplotting of text labels in ggplot2. It provides a set of functions for positioning labels in a way that minimizes overlap and maximizes readability. Documentation: https://ggrepel.slowkow.com/
+tidyverse: A collection of packages for data manipulation and visualization in R. It provides a consistent set of tools for working with data, including data cleaning, transformation, and visualization. Documentation: <https://www.tidyverse.org/>
 
-ggthemes: A package for creating visually appealing themes for ggplot2 graphics. It provides a set of pre-designed themes that can be used to customize the appearance of your plots. Documentation: https://yutannihilation.github.io/allYourFigureAreBelongToUs/ggthemes/
+ggrepel: A package for avoiding overplotting of text labels in ggplot2. It provides a set of functions for positioning labels in a way that minimizes overlap and maximizes readability. Documentation: <https://ggrepel.slowkow.com/>
 
-hrbrthemes: A package for creating visually appealing themes for ggplot2 graphics. It provides a set of pre-designed themes that are designed to be aesthetically pleasing and easy to read. Documentation: https://hrbrmstr.github.io/hrbrthemes/
+ggthemes: A package for creating visually appealing themes for ggplot2 graphics. It provides a set of pre-designed themes that can be used to customize the appearance of your plots. Documentation: <https://yutannihilation.github.io/allYourFigureAreBelongToUs/ggthemes/>
 
-ggstatsplot: A package for creating publication-ready plots with statistical analysis built-in. It provides a set of functions for creating common statistical plots, including scatterplots, boxplots, and histograms, with statistical tests and summary information included. Documentation: https://indrajeetpatil.github.io/ggstatsplot/
+hrbrthemes: A package for creating visually appealing themes for ggplot2 graphics. It provides a set of pre-designed themes that are designed to be aesthetically pleasing and easy to read. Documentation: <https://hrbrmstr.github.io/hrbrthemes/>
 
-pals: A package for creating color palettes for data visualization. It provides a set of functions for generating color palettes based on various themes and color schemes. Documentation: https://cran.r-project.org/web/packages/pals/vignettes/pals_examples.html
+ggstatsplot: A package for creating publication-ready plots with statistical analysis built-in. It provides a set of functions for creating common statistical plots, including scatterplots, boxplots, and histograms, with statistical tests and summary information included. Documentation: <https://indrajeetpatil.github.io/ggstatsplot/>
 
-readxl: A package for reading Excel files in R. It provides a set of functions for importing data from Excel spreadsheets into R data frames. Documentation: https://readxl.tidyverse.org/
+pals: A package for creating color palettes for data visualization. It provides a set of functions for generating color palettes based on various themes and color schemes. Documentation: <https://cran.r-project.org/web/packages/pals/vignettes/pals_examples.html>
 
-performance: A package for evaluating the performance of predictive models in R. It provides a set of functions for creating various types of performance metrics and visualizations. Documentation: https://easystats.github.io/performance/
+readxl: A package for reading Excel files in R. It provides a set of functions for importing data from Excel spreadsheets into R data frames. Documentation: <https://readxl.tidyverse.org/>
 
-parameters: A package for managing parameters and arguments in R. It provides a set of functions for defining, validating, and documenting parameters in R functions. Documentation: https://www.rdocumentation.org/packages/parameters/versions/0.21.0
+performance: A package for evaluating the performance of predictive models in R. It provides a set of functions for creating various types of performance metrics and visualizations. Documentation: <https://easystats.github.io/performance/>
 
-see: A package for visualizing the output of R functions. It provides a set of functions for creating visual summaries of data frames, matrices, and other R objects. Documentation: https://cran.r-project.org/web/packages/see/index.html
+parameters: A package for managing parameters and arguments in R. It provides a set of functions for defining, validating, and documenting parameters in R functions. Documentation: <https://www.rdocumentation.org/packages/parameters/versions/0.21.0>
+
+see: A package for visualizing the output of R functions. It provides a set of functions for creating visual summaries of data frames, matrices, and other R objects. Documentation: <https://cran.r-project.org/web/packages/see/index.html>
 
 ## 2.2 Dataset introduction
 
@@ -133,7 +134,6 @@ table(part_info$educationLevel)
 sum(is.na(part_info))
 ```
 
-
 ## Check for duplicates
 
 ```{r}
@@ -145,6 +145,7 @@ Since 0 rows are displayed. We can confirm that duplicates do not exist in this 
 :::
 
 ### Finance csv
+
 Lets move on to examine the properties of the finance csv file.
 
 ::: panel-tabset
@@ -187,6 +188,7 @@ table(finance$category)
 ```{r}
 sum(is.na(finance))
 ```
+
 There is ni missing values
 
 ## Check for outliers
@@ -254,6 +256,7 @@ Clicking from the above table, we do realize that most participant id has transa
 :::
 
 Using the code below, we built a table and identify residents with irregular transactions
+
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
@@ -417,7 +420,8 @@ v8<- ggplot(part_info, aes(x = age)) +
 v7 + v8
 
 ```
-From the charts,  we can observe that across different age, high school educated residents are of the majority while low educated residents are of the minority.
+
+From the charts, we can observe that across different age, high school educated residents are of the majority while low educated residents are of the minority.
 
 ::: {.callout-note title="Note"}
 Added fig.height to make sure that the charts are not overly compressed
@@ -436,6 +440,7 @@ ggplot(part_info, aes(x = haveKids, y = householdSize)) +
        y = "Household Size")
 
 ```
+
 From the chart, we observe a pattern that only household with 3 person have kids while those with 2 do not. This is useful because for the authorities, provison of subsidies such as milk and diaper vouchers can be directed specifically to family with more than 3 household members
 
 ### 3.1.3 Have kids vs education
@@ -502,9 +507,10 @@ girafe(ggobj = gg_point,
        height_svg = 8*0.618)
 ```
 
-From the chart above,  we do not observe any significant difference.However we do note that mean age of residents who do not have kids are sightly lower than those who do have kids.
+From the chart above, we do not observe any significant difference.However we do note that mean age of residents who do not have kids are sightly lower than those who do have kids.
 
 Let's perform a statistical test to determine if there is a difference in the mean
+
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
@@ -552,7 +558,6 @@ plotly_plot
 
 ```
 
-
 From the above chart, we observe that interest group I has exceptionally high percentage of participants from low education level while interest group E has the exceptionally low percentage of participant from low education level residents. For other education levels, interest group participation, percentage of participation across interest groups varies shows less of huge difference. More information may be required to determine the reasons behind.
 
 ### 3.1.6 Mean joviality vs education
@@ -591,6 +596,7 @@ girafe(ggobj = gg_point,
 We can observe from the above chart that mean joviality increases with increasing education level.
 
 Let's perform a statistical test to determine if there is a difference in the mean jovialaity
+
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
@@ -642,6 +648,7 @@ girafe(ggobj = gg_point,
 We observe that mean joviality for single person household is highest display an decreasing trend with increasing number of members of the household. Household size of 3 seems to have the least joviality. A possible reason may be that stress from raising the children may have made them less jovial, this may be a potential area that authorities can examine (with more information) if they hope to raise the mean joviality of the group.
 
 Let's perform a statistical test to determine if there is a difference in the mean joviality
+
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
@@ -699,6 +706,7 @@ girafe(ggobj = gg_point,
 From the chart above, we observe that mean joviality is lower for residents who have kids, this correspond to our previous analysis of mean joviality vs household size where household with 3 residents has the lowest mean joviality which may be caused by additional stress of taking care of kids
 
 Let's perform a statistical test to determine if there is a difference in the mean joviality
+
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
@@ -736,6 +744,7 @@ ggplotly(ggplot(age_joviality, aes(x = age, y = mean_joviality)) +
 From the point plot alone, we do not see a distinct trend with age and mean joviality except that resident of age 53 has the lowest mean joviality and resident of age 59 has the highest mean joviality. When we overlay a smoothed line plot, we can see that mean joviality decreases with increasing age.
 
 Let's perform a statistical test to determine if there is a difference in the mean joviality
+
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
@@ -855,6 +864,7 @@ ggplot(data = joviality_interest, aes(x = interestGroup, y = joviality)) +
 Interest group E provides the highest mean joviality. If officials are looking to improve joviality among residents, they may consider encouraging participation in interest group E through ways such as subsidizing group E membership, etc
 
 Let's perform a statistical test to determine if there is a difference in the mean joviality
+
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
@@ -1071,7 +1081,10 @@ ggplotly(ggplot(wage_data, aes(x = total_spent, y = joviality)) +
 Using the smooth trend line, we can observe that joviality generally decrease with increasing wage. This may be because a higher wage may mean more responsibility at work and hence greater amount of stress which lead to lower joviality
 
 Let's perform a statistical test to determine if there is a correlation between joviality and wage
+
 ```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
 ggscatterstats(
   data = wage_data,
   x = total_spent,
@@ -1134,7 +1147,8 @@ check_collinearity(model)
 check_c <- check_collinearity(model)
 plot(check_c)
 ```
-From the results, we can determine that there is a low correlation between education level and  interest group attended against wage
+
+From the results, we can determine that there is a low correlation between education level and interest group attended against wage
 
 ### 3.3.4 Percentage of spending within each category for each group
 
@@ -1197,9 +1211,10 @@ ggplot(recreation_data, aes(x = total_spent, y = joviality)) +
   labs(x = "Recreation Spending", y = "Joviality") + geom_point()
 ```
 
-From the above observation,  it seems that increasing spending would increase joviality until a saturation is reached at around \$10000. Note that the chart is plotted on a negative x-axis as spending is accounted for as negative value.
+From the above observation, it seems that increasing spending would increase joviality until a saturation is reached at around \$10000. Note that the chart is plotted on a negative x-axis as spending is accounted for as negative value.
 
 Let's perform a statistical test to determine if there is a correlation bewteen joviality and recreation spending
+
 ```{r}
 #| code-fold: true
 #| code-summary: "Show the code"
