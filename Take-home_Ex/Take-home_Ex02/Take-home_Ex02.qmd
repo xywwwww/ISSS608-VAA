@@ -1,0 +1,149 @@
+---
+title: "Take-home_Ex02"
+author: "Wan Xinyu"
+---
+
+```{r}
+pacman::p_load(jsonlite,tidygraph, ggraph,visNetwork,tidyverse)
+```
+
+```{r}
+#MC2 <- fromJSON("MC2/data/mc2_challenge_graph.json")
+```
+
+```{r}
+#MC2_nodes <- as_tibble(MC2$nodes) %>%
+  #select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+#MC2_nodes_rm_na <- MC2_nodes %>% drop_na(shpcountry, rcvcountry)
+```
+
+```{r}
+#MC2_nodes_rm_na
+```
+
+```{r}
+#MC2_edges <- as_tibble(MC2$links) %>%
+#select(-dataset)
+```
+
+```{r}
+#glimpse(MC2_edges)
+```
+
+```{r}
+#MC2_edges <- MC2_edges %>% 
+#mutate(arrivaldate = ymd(arrivaldate)) %>%
+  #mutate(hscode = as.integer(hscode))
+```
+
+```{r}
+#glimpse(MC2_edges)
+```
+
+```{r}
+#anyNA(MC2_edges$arrivaldate)
+```
+
+```{r}
+#MC2_edges_aggregated <- MC2_edges %>%
+  #group_by(arrivaldate, hscode, source, target) %>%
+    #summarise(weight = sum(weightkg)) %>%
+  #filter(source!=target) %>%
+  #filter(weight >= 1) %>%
+  #ungroup()
+```
+
+```{r}
+#glimpse(MC2_edges_aggregated)
+```
+
+```{r}
+#MC2_edges_aggregated_2028 <- MC2_edges %>%
+  #filter(arrivaldate >= "2028-01-01") %>%
+   #filter(arrivaldate < "2029-01-01") %>%
+  #group_by(arrivaldate, hscode, source, target) %>%
+    #summarise(weight = sum(weightkg)) %>%
+  #filter(source!=target) %>%
+  #filter(weight >= 1) %>%
+  #ungroup()
+```
+
+```{r}
+#summary(MC2_edges_aggregated_2028)
+```
+
+```{r}
+#MC2_graph <- tbl_graph(nodes = MC2_nodes,
+                       #edges = MC2_edges_aggregated_2028,
+                       #directed = TRUE)
+```
+
+```{r}
+#MC2_graph %>%
+  #activate(edges)%>%
+  #arrange(desc(weight))
+```
+
+```{r}
+#MC2_graph
+```
+
+```{r}
+#ggraph(MC2_graph)+
+   #geom_edge_link() +
+  #geom_node_point()
+
+```
+
+Bundle
+
+```{r}
+#carp <- fromJSON("MC2/data/bundles/carp.json")
+```
+
+```{r}
+#catfish <- fromJSON("MC2/data/bundles/catfish.json")
+```
+
+```{r}
+#chub_mackerel <- fromJSON("MC2/data/bundles/chub_mackerel.json")
+```
+
+```{r}
+#cod2 <- fromJSON("MC2/data/bundles/cod2.json")
+```
+
+```{r}
+#herring <- fromJSON("MC2/data/bundles/herring.json")
+```
+
+```{r}
+#lichen <- fromJSON("MC2/data/bundles/lichen.json")
+```
+
+```{r}
+#mackerel <- fromJSON("MC2/data/bundles/mackerel.json")
+```
+
+```{r}
+#pollock <- fromJSON("MC2/data/bundles/pollock.json")
+```
+
+```{r}
+#salmon <- fromJSON("MC2/data/bundles/salmon.json")
+```
+
+```{r}
+#salmon_wgl <- fromJSON("MC2/data/bundles/salmon_wgl.json")
+```
+
+```{r}
+#shark <- fromJSON("MC2/data/bundles/shark.json")
+```
+
+```{r}
+#tuna <- fromJSON("MC2/data/bundles/tuna.json")
+```

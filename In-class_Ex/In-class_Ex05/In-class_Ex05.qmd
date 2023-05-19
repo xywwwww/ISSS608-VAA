@@ -6,9 +6,8 @@ execute:
 ---
 
 ```{r}
-pacman::p_load(jsonlite,tidygraph, ggrapjh,vidiNetwork,tidverse)
+pacman::p_load(jsonlite,tidygraph, ggraph,visNetwork,tidyverse)
 ```
-
 
 ```{r}
 MC1 <- fromJSON("MC1/data/MC1.json")
