@@ -4,6 +4,7 @@ project:
 website:
   title: "ISSS608-VAA"
   navbar:
+    background: transparent
     logo: "research.png"
     left:
     - text: "Hands-on Exercise"
@@ -54,8 +55,8 @@ website:
 format:
   html:
     theme:
-      light: zephyr
-      dark: darkly
+      light: Default
+      dark: Darkly
     mainfont: serif
     css: styles.css
     toc: true
