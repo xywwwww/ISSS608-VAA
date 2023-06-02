@@ -1,149 +1,1940 @@
 ---
 title: "Take-home_Ex02"
-author: "Wan Xinyu"
+author: "Wan Xinyu" 
+execute: 
+  warning: false
 ---
 
-```{r}
-pacman::p_load(jsonlite,tidygraph, ggraph,visNetwork,tidyverse)
-```
+# From kickstarter
+
+## Loading the packages
 
 ```{r}
-#MC2 <- fromJSON("MC2/data/mc2_challenge_graph.json")
+pacman::p_load(jsonlite,tidygraph, ggraph,visNetwork,tidyverse,igraph,ggplot2, scales)
 ```
 
-```{r}
-#MC2_nodes <- as_tibble(MC2$nodes) %>%
-  #select(shpcountry, rcvcountry, id)
-```
+## Loading the files
 
 ```{r}
-#MC2_nodes_rm_na <- MC2_nodes %>% drop_na(shpcountry, rcvcountry)
+MC2 <- fromJSON("MC2/data/mc2_challenge_graph.json")
 ```
 
-```{r}
-#MC2_nodes_rm_na
-```
+## Creating the node dataframe
 
 ```{r}
-#MC2_edges <- as_tibble(MC2$links) %>%
-#select(-dataset)
+MC2_nodes <- as_tibble(MC2$nodes) %>%
+  select(shpcountry, rcvcountry, id)
 ```
 
-```{r}
-#glimpse(MC2_edges)
-```
+### Sneak Peak at the dataframe
 
 ```{r}
-#MC2_edges <- MC2_edges %>% 
-#mutate(arrivaldate = ymd(arrivaldate)) %>%
-  #mutate(hscode = as.integer(hscode))
+glimpse(MC2_nodes)
 ```
 
-```{r}
-#glimpse(MC2_edges)
-```
+## Checking and displaying duplicate rolls
 
 ```{r}
-#anyNA(MC2_edges$arrivaldate)
+# Check for duplicates
+duplicate_rows <- MC2_nodes[duplicated(MC2_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows
 ```
 
-```{r}
-#MC2_edges_aggregated <- MC2_edges %>%
-  #group_by(arrivaldate, hscode, source, target) %>%
-    #summarise(weight = sum(weightkg)) %>%
-  #filter(source!=target) %>%
-  #filter(weight >= 1) %>%
-  #ungroup()
-```
+## Creating the edge data frame
 
 ```{r}
-#glimpse(MC2_edges_aggregated)
+MC2_edges <- as_tibble(MC2$links) %>%
+  select(-dataset)
 ```
 
-```{r}
-#MC2_edges_aggregated_2028 <- MC2_edges %>%
-  #filter(arrivaldate >= "2028-01-01") %>%
-   #filter(arrivaldate < "2029-01-01") %>%
-  #group_by(arrivaldate, hscode, source, target) %>%
-    #summarise(weight = sum(weightkg)) %>%
-  #filter(source!=target) %>%
-  #filter(weight >= 1) %>%
-  #ungroup()
-```
+### Sneak peak at the data frame
 
 ```{r}
-#summary(MC2_edges_aggregated_2028)
-```
-
-```{r}
-#MC2_graph <- tbl_graph(nodes = MC2_nodes,
-                       #edges = MC2_edges_aggregated_2028,
-                       #directed = TRUE)
-```
-
-```{r}
-#MC2_graph %>%
-  #activate(edges)%>%
-  #arrange(desc(weight))
-```
-
-```{r}
-#MC2_graph
-```
-
-```{r}
-#ggraph(MC2_graph)+
-   #geom_edge_link() +
-  #geom_node_point()
+glimpse(MC2_edges)
 
 ```
 
-Bundle
+## Checking and displaying duplicates
 
 ```{r}
-#carp <- fromJSON("MC2/data/bundles/carp.json")
+# Check for duplicates
+duplicate_rows_1 <- MC2_edges[duplicated(MC2_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_1
+```
+
+### Removing duplicates from the data frame
+
+```{r}
+# Remove duplicates
+MC2_edges <- MC2_edges[!duplicated(MC2_edges), ]
+
+# View the dataframe without duplicates
+MC2_edges
+```
+
+## Changing the data type
+
+```{r}
+MC2_edges <- MC2_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+## Wrangling attributes
+
+```{r}
+MC2_edges_aggregated <- MC2_edges %>%
+  group_by(source, target) %>%
+    summarise(weight = n()) %>%
+  filter(source!=target) %>%
+  filter(weight >= 1) %>%
+  ungroup()
+```
+
+## Preparing nodes data
+
+```{r}
+id1 <- MC2_edges_aggregated %>%
+  select(source) %>%
+  rename(id = source)
+id2 <- MC2_edges_aggregated %>%
+  select(target) %>%
+  rename(id = target)
+MC2_nodes_extracted <- rbind(id1, id2) %>%
+  distinct()
+```
+
+## Using tbl_graph() to build tidygraph data model.
+
+```{r}
+MC2_graph <- tbl_graph(nodes = MC2_nodes_extracted,
+                       edges = MC2_edges_aggregated,
+                       directed = TRUE)
+```
+
+## Changing the active object
+
+```{r}
+MC2_graph %>%
+  activate(edges)%>%
+  arrange(desc(weight))
+```
+
+# Initial approach
+
+## Exploring the distribution of weight
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the weight column from the edges of the largest connected component
+weights <- E(MC2_graph)$weight
+
+# Create a data frame with the weights
+data <- data.frame(weight = weights)
+ggplot(data, aes(x = weight)) +
+  geom_histogram(fill = "lightblue", color = "black") +
+  scale_y_log10() +
+  labs(x = "Weight", y = "Count") +
+  ggtitle("Histogram of Weight with Log Scale")
+
+```
+
+From the above chart, we see that majority of the count of weights lies
+below count of 15000 so lets set weight of 15000 as an acceptable range
+of weight and we will examine those source and nodes which fall beyond
+the range.
+
+Let's retrieve the source and target node of these companies.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Filter the edges based on the weight condition
+filtered_edges <- E(MC2_graph)[weight > 15000]
+
+# Retrieve the source and target nodes
+source_nodes <- ends(MC2_graph, filtered_edges)[, 1]
+target_nodes <- ends(MC2_graph, filtered_edges)[, 2]
+
+# Combine the source and target nodes into a data frame
+outliers <- data.frame(Source = source_nodes, Target = target_nodes)
+
+# Print the outliers
+outliers
+
+
+```
+
+Let's map the results into node names
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Retrieve the names of nodes using node IDs
+source_node_names <- V(MC2_graph)$id[source_nodes]
+target_node_names <- V(MC2_graph)$id[target_nodes]
+
+# Combine the node names into a data frame
+outliers <- data.frame(Source = source_node_names, Target = target_node_names)
+
+# Add a new column for weight
+outliers$Weight <- filtered_edges$weight
+
+# Rank the results based on the weight column
+outliers <- outliers[order(outliers$Weight, decreasing = TRUE), ]
+
+# Print the ranked outliers
+outliers
+```
+
+Hence we will examine these source and node pairs with these extremely
+large weights in details
+
+## Examining outliers
+
+```{r}
+outlier1_edges_aggregated <- MC2_edges %>%
+  filter(source == "Marine Masterminds Dry dock" & target == "Saltwater Supreme ОАО Forwading") %>%
+  group_by(arrivaldate,hscode, valueofgoods_omu, 
+         volumeteu, weightkg, valueofgoodsusd) %>%
+  ungroup()
+```
+
+Let's see how many distinct product were shipped
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the month from the 'arrivaldate'
+outlier1_edges_aggregated$month <- format(outlier1_edges_aggregated$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+outlier1_edges_aggregated$month <- factor(outlier1_edges_aggregated$month, levels = month.abb)
+
+# Create the chart with facet wrap
+ggplot(outlier1_edges_aggregated, aes(x = month, y = weightkg, fill = hscode)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(x = "Month", y = "Weight (kg)", fill = "HS Code") +
+  ggtitle("Weight by Month and HS Code") +
+  facet_wrap(~ year(arrivaldate)) +
+  guides(fill = FALSE)
+```
+
+The above graph is not much of use other than informing that DEC 2033
+and Aug 2034 have some extremely large values as they are categorized by
+hscodes. We need to use the bundle data set to group the hscode together
+and visualize this again.
+
+# Bundle manipulation
+
+::: panel-tabset
+## carp
+
+```{r}
+carp <- fromJSON("MC2/data/bundles/carp.json")
 ```
 
 ```{r}
-#catfish <- fromJSON("MC2/data/bundles/catfish.json")
+carp_nodes <- as_tibble(carp$nodes) %>%
+  select(shpcountry, rcvcountry, id)
 ```
 
 ```{r}
-#chub_mackerel <- fromJSON("MC2/data/bundles/chub_mackerel.json")
+duplicate_rows_carp_node <- carp_nodes[duplicated(carp_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_carp_node
 ```
 
 ```{r}
-#cod2 <- fromJSON("MC2/data/bundles/cod2.json")
+carp_edges <- as_tibble(carp$links) %>%
+  select(-dataset)
 ```
 
 ```{r}
-#herring <- fromJSON("MC2/data/bundles/herring.json")
+duplicate_rows_carp_edges <- carp_edges[duplicated(carp_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_carp_edges
 ```
 
 ```{r}
-#lichen <- fromJSON("MC2/data/bundles/lichen.json")
+glimpse(carp_edges)
 ```
 
 ```{r}
-#mackerel <- fromJSON("MC2/data/bundles/mackerel.json")
+carp_edges <- carp_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
 ```
 
 ```{r}
-#pollock <- fromJSON("MC2/data/bundles/pollock.json")
+distinct_hscode_carp <- distinct(carp_edges, hscode)%>%
+  mutate(category = "carp")
+
+distinct_hscode_carp
+```
+
+## Catfish
+
+```{r}
+catfish <- fromJSON("MC2/data/bundles/catfish.json")
 ```
 
 ```{r}
-#salmon <- fromJSON("MC2/data/bundles/salmon.json")
+catfish_nodes <- as_tibble(catfish$nodes) %>%
+  select(shpcountry, rcvcountry, id)
 ```
 
 ```{r}
-#salmon_wgl <- fromJSON("MC2/data/bundles/salmon_wgl.json")
+duplicate_rows_catfish_node <- catfish_nodes[duplicated(catfish_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_catfish_node
 ```
 
 ```{r}
-#shark <- fromJSON("MC2/data/bundles/shark.json")
+catfish_edges <- as_tibble(catfish$links) %>%
+  select(-dataset)
 ```
 
 ```{r}
-#tuna <- fromJSON("MC2/data/bundles/tuna.json")
+duplicate_rows_catfish_edges <- catfish_edges[duplicated(catfish_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_catfish_edges
 ```
+
+```{r}
+catfish_edges <- catfish_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_catfish <- distinct(catfish_edges, hscode)%>%
+  mutate(category = "catfish")
+
+distinct_hscode_catfish
+```
+
+## Chub_mackerel
+
+```{r}
+chub_mackerel <- fromJSON("MC2/data/bundles/chub_mackerel.json")
+```
+
+```{r}
+chub_mackerel_nodes <- as_tibble(chub_mackerel$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_chub_mackerel_node <- chub_mackerel_nodes[duplicated(chub_mackerel_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_chub_mackerel_node
+```
+
+```{r}
+chub_mackerel_edges <- as_tibble(chub_mackerel$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_chub_mackerel_edges <- chub_mackerel_edges[duplicated(chub_mackerel_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_chub_mackerel_edges
+```
+
+```{r}
+chub_mackerel_edges <- chub_mackerel_edges[!duplicated(chub_mackerel_edges), ]
+```
+
+```{r}
+chub_mackerel_edges <- chub_mackerel_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_chub_mackerel <- distinct(chub_mackerel_edges, hscode)%>%
+  mutate(category = "chub_mackerel")
+
+distinct_hscode_chub_mackerel
+```
+
+## Cods2
+
+```{r}
+cod2 <- fromJSON("MC2/data/bundles/cod2.json")
+```
+
+```{r}
+cod2_nodes <- as_tibble(cod2$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_cod2_node <- cod2_nodes[duplicated(cod2_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_cod2_node
+```
+
+```{r}
+cod2_edges <- as_tibble(cod2$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_cod2_edges <- cod2_edges[duplicated(cod2_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_cod2_edges
+```
+
+```{r}
+cod2_edges <- cod2_edges[!duplicated(cod2_edges), ]
+```
+
+```{r}
+cod2_edges <- cod2_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_cod2 <- distinct(cod2_edges, hscode)%>%
+  mutate(category = "cod2")
+
+distinct_hscode_cod2
+```
+
+## Herring
+
+```{r}
+herring <- fromJSON("MC2/data/bundles/herring.json")
+```
+
+```{r}
+herring_nodes <- as_tibble(herring$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_herring_node <- herring_nodes[duplicated(herring_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_herring_node
+```
+
+```{r}
+herring_edges <- as_tibble(herring$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_herring_edges <- herring_edges[duplicated(herring_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_herring_edges
+```
+
+```{r}
+herring_edges <- herring_edges[!duplicated(herring_edges), ]
+```
+
+```{r}
+herring_edges <- herring_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_herring <- distinct(herring_edges, hscode)%>%
+  mutate(category = "herring")
+
+distinct_hscode_herring
+```
+
+## Lichen
+
+```{r}
+lichen <- fromJSON("MC2/data/bundles/lichen.json")
+```
+
+```{r}
+lichen_nodes <- as_tibble(lichen$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_lichen_node <- lichen_nodes[duplicated(lichen_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_lichen_node
+```
+
+```{r}
+lichen_edges <- as_tibble(lichen$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_lichen_edges <- lichen_edges[duplicated(lichen_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_lichen_edges
+```
+
+```{r}
+lichen_edges <- lichen_edges[!duplicated(lichen_edges), ]
+```
+
+```{r}
+lichen_edges <- lichen_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_lichen <- distinct(lichen_edges, hscode)%>%
+  mutate(category = "lichen")
+
+distinct_hscode_lichen
+```
+
+## Mackerel
+
+```{r}
+mackerel <- fromJSON("MC2/data/bundles/mackerel.json")
+```
+
+```{r}
+mackerel_nodes <- as_tibble(mackerel$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_mackerel_node <- mackerel_nodes[duplicated(mackerel_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_mackerel_node
+```
+
+```{r}
+mackerel_edges <- as_tibble(mackerel$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_mackerel_edges <- mackerel_edges[duplicated(mackerel_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_mackerel_edges
+```
+
+No duplicates
+
+```{r}
+mackerel_edges <- mackerel_edges[!duplicated(mackerel_edges), ]
+```
+
+```{r}
+mackerel_edges <- mackerel_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_mackerel <- distinct(mackerel_edges, hscode)%>%
+  mutate(category = "mackerel")
+
+distinct_hscode_mackerel
+```
+
+## Pollock
+
+```{r}
+pollock <- fromJSON("MC2/data/bundles/pollock.json")
+```
+
+```{r}
+pollock_nodes <- as_tibble(pollock$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_pollock_node <- pollock_nodes[duplicated(pollock_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_pollock_node
+```
+
+```{r}
+pollock_edges <- as_tibble(pollock$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_pollock_edges <- pollock_edges[duplicated(pollock_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_pollock_edges
+```
+
+```{r}
+pollock_edges <- pollock_edges[!duplicated(pollock_edges), ]
+```
+
+```{r}
+pollock_edges <- pollock_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_pollock <- distinct(pollock_edges, hscode)%>%
+  mutate(category = "pollock")
+
+distinct_hscode_pollock
+```
+
+## Salmon
+
+```{r}
+salmon <- fromJSON("MC2/data/bundles/salmon.json")
+```
+
+```{r}
+salmon_nodes <- as_tibble(salmon$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_salmon_node <- salmon_nodes[duplicated(salmon_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_salmon_node
+```
+
+```{r}
+salmon_edges <- as_tibble(salmon$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_salmon_edges <- salmon_edges[duplicated(salmon_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_salmon_edges
+```
+
+```{r}
+salmon_edges <- salmon_edges[!duplicated(salmon_edges), ]
+```
+
+```{r}
+salmon_edges <- salmon_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_salmon <- distinct(salmon_edges, hscode)%>%
+  mutate(category = "salmon")
+
+distinct_hscode_salmon
+```
+
+## Salmon_wgl
+
+```{r}
+salmon_wgl <- fromJSON("MC2/data/bundles/salmon_wgl.json")
+```
+
+```{r}
+salmon_wgl_nodes <- as_tibble(salmon_wgl$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_salmon_wgl_node <- salmon_wgl_nodes[duplicated(salmon_wgl_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_salmon_wgl_node
+```
+
+```{r}
+salmon_wgl_edges <- as_tibble(salmon_wgl$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_salmon_wgl_edges <- salmon_wgl_edges[duplicated(salmon_wgl_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_salmon_wgl_edges
+```
+
+```{r}
+salmon_wgl_edges <- salmon_wgl_edges[!duplicated(salmon_wgl_edges), ]
+```
+
+```{r}
+salmon_wgl_edges <- salmon_wgl_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_salmon_wgl <- distinct(salmon_wgl_edges, hscode)%>%
+  mutate(category = "salmon_wgl")
+
+distinct_hscode_salmon_wgl
+```
+
+##Shark
+
+```{r}
+shark <- fromJSON("MC2/data/bundles/shark.json")
+```
+
+```{r}
+shark_nodes <- as_tibble(shark$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_shark_node <- shark_nodes[duplicated(shark_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_shark_node
+```
+
+```{r}
+shark_edges <- as_tibble(shark$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_shark_edges <- shark_edges[duplicated(shark_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_shark_edges
+```
+
+```{r}
+shark_edges <- shark_edges[!duplicated(shark_edges), ]
+```
+
+```{r}
+shark_edges <- shark_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_shark <- distinct(shark_edges, hscode)%>%
+  mutate(category = "shark")
+
+distinct_hscode_shark
+```
+
+## Tuna
+
+```{r}
+tuna <- fromJSON("MC2/data/bundles/tuna.json")
+```
+
+```{r}
+tuna_nodes <- as_tibble(tuna$nodes) %>%
+  select(shpcountry, rcvcountry, id)
+```
+
+```{r}
+duplicate_rows_tuna_node <- tuna_nodes[duplicated(tuna_nodes), ]
+
+# Display the duplicate rows
+duplicate_rows_tuna_node
+```
+
+```{r}
+tuna_edges <- as_tibble(tuna$links) %>%
+  select(-dataset)
+```
+
+```{r}
+duplicate_rows_tuna_edges <- tuna_edges[duplicated(tuna_edges), ]
+
+# Display the duplicate rows
+duplicate_rows_tuna_edges
+```
+
+```{r}
+tuna_edges <- tuna_edges[!duplicated(tuna_edges), ]
+```
+
+```{r}
+tuna_edges <- tuna_edges %>% 
+  mutate(arrivaldate = ymd(arrivaldate))
+```
+
+```{r}
+distinct_hscode_tuna <- distinct(tuna_edges, hscode)%>%
+  mutate(category = "tuna")
+
+distinct_hscode_tuna
+```
+:::
+
+## Creating a combined dataframe with distinct HS code
+
+```{r}
+combined_df <- bind_rows(distinct_hscode_tuna %>% mutate(category = "carp"),
+                         distinct_hscode_carp %>% mutate(category = "catfish"),
+                         distinct_hscode_carp %>% mutate(category = "chub_mackerel"),
+                         distinct_hscode_carp %>% mutate(category = "cod2"),
+                         distinct_hscode_carp %>% mutate(category = "herring"),
+                         distinct_hscode_carp %>% mutate(category = "lichen"),
+                         distinct_hscode_carp %>% mutate(category = "mackerel"),
+                         distinct_hscode_carp %>% mutate(category = "pollock"),
+                         distinct_hscode_carp %>% mutate(category = "salmon"),
+                         distinct_hscode_carp %>% mutate(category = "salmon_wgl"),
+                         distinct_hscode_carp %>% mutate(category = "shark"),
+                         distinct_hscode_carp %>% mutate(category = "tuna"))
+
+```
+
+## Adding category column to MC2_edges by merging the two data frames
+
+```{r}
+combined_df <- combined_df %>%
+  mutate(hscode = as.character(hscode))
+
+MC2_edges <- MC2_edges %>%
+  left_join(combined_df, by = "hscode") %>%
+  mutate(category = ifelse(is.na(category), "no_category", category))
+```
+
+## Examining the outlier
+
+Let's perform the graph for our anomalies source and nodes again
+
+::: panel-tabset
+## Outlier 1
+
+```{r}
+outlier1_edges_aggregated <- MC2_edges %>%
+  filter(source == "French Crab S.p.A. Worldwide" & target == "Saltwater Supreme ОАО Forwading") %>%
+  group_by(arrivaldate,hscode, valueofgoods_omu, 
+         volumeteu, weightkg, valueofgoodsusd) %>%
+  ungroup()
+```
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the month from the 'arrivaldate'
+outlier1_edges_aggregated$month <- format(outlier1_edges_aggregated$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+outlier1_edges_aggregated$month <- factor(outlier1_edges_aggregated$month, levels = month.abb)
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+
+# Create the chart with facet wrap
+ggplot(outlier1_edges_aggregated, aes(x = month, y = weightkg, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight (kg)", fill = "Category") +
+  ggtitle("Weight by Month and category") +
+  facet_wrap(~ year(arrivaldate))
+```
+
+## Outlier 2
+
+```{r}
+outlier2_edges_aggregated <- MC2_edges %>%
+  filter(source == "French Crab S.p.A. Worldwide" & target == "Saltwater Supreme ОАО Forwading") %>%
+  group_by(arrivaldate,hscode, valueofgoods_omu, 
+         volumeteu, weightkg, valueofgoodsusd) %>%
+  ungroup()
+```
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the month from the 'arrivaldate'
+outlier2_edges_aggregated$month <- format(outlier2_edges_aggregated$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+outlier2_edges_aggregated$month <- factor(outlier2_edges_aggregated$month, levels = month.abb)
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+
+# Create the chart with facet wrap
+ggplot(outlier2_edges_aggregated, aes(x = month, y = weightkg, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight (kg)", fill = "Category") +
+  ggtitle("Weight by Month and category") +
+  facet_wrap(~ year(arrivaldate))
+```
+
+## Outlier 3
+
+```{r}
+outlier3_edges_aggregated <- MC2_edges %>%
+  filter(source == "Coastal Cruisers Pic Shipping" & target == "Caracola del Sol Services") %>%
+  group_by(arrivaldate,hscode, valueofgoods_omu, 
+         volumeteu, weightkg, valueofgoodsusd) %>%
+  ungroup()
+```
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the month from the 'arrivaldate'
+outlier3_edges_aggregated$month <- format(outlier3_edges_aggregated$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+outlier3_edges_aggregated$month <- factor(outlier3_edges_aggregated$month, levels = month.abb)
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+
+# Create the chart with facet wrap
+ggplot(outlier3_edges_aggregated, aes(x = month, y = weightkg, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight (kg)", fill = "Category") +
+  ggtitle("Weight by Month and category") +
+  facet_wrap(~ year(arrivaldate))
+```
+
+## Outlier 4
+
+```{r}
+outlier4_edges_aggregated <- MC2_edges %>%
+  filter(source == "Olas del Sur Sea" & target == "Greek Sea Bass LLC") %>%
+  group_by(arrivaldate,hscode, valueofgoods_omu, 
+         volumeteu, weightkg, valueofgoodsusd) %>%
+  ungroup()
+```
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the month from the 'arrivaldate'
+outlier4_edges_aggregated$month <- format(outlier4_edges_aggregated$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+outlier4_edges_aggregated$month <- factor(outlier4_edges_aggregated$month, levels = month.abb)
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+
+# Create the chart with facet wrap
+ggplot(outlier4_edges_aggregated, aes(x = month, y = weightkg, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight (kg)", fill = "Category") +
+  ggtitle("Weight by Month and category") +
+  facet_wrap(~ year(arrivaldate))
+```
+
+## Outlier 5
+
+```{r}
+outlier5_edges_aggregated <- MC2_edges %>%
+  filter(source == "Uttar Pradesh s CJSC" & target == "Sea Breezes GmbH & Co. KG Shark") %>%
+  group_by(arrivaldate,hscode, valueofgoods_omu, 
+         volumeteu, weightkg, valueofgoodsusd) %>%
+  ungroup()
+```
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the month from the 'arrivaldate'
+outlier5_edges_aggregated$month <- format(outlier5_edges_aggregated$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+outlier5_edges_aggregated$month <- factor(outlier5_edges_aggregated$month, levels = month.abb)
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+
+# Create the chart with facet wrap
+ggplot(outlier5_edges_aggregated, aes(x = month, y = weightkg, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight (kg)", fill = "Category") +
+  ggtitle("Weight by Month and category") +
+  facet_wrap(~ year(arrivaldate))
+```
+
+## Outlier 6
+
+```{r}
+outlier6_edges_aggregated <- MC2_edges %>%
+  filter(source == "Mar y Luna Sagl" & target == "Panope Limited Liability Company") %>%
+  group_by(arrivaldate,hscode, valueofgoods_omu, 
+         volumeteu, weightkg, valueofgoodsusd) %>%
+  ungroup()
+```
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the month from the 'arrivaldate'
+outlier6_edges_aggregated$month <- format(outlier6_edges_aggregated$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+outlier6_edges_aggregated$month <- factor(outlier6_edges_aggregated$month, levels = month.abb)
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+
+# Create the chart with facet wrap
+ggplot(outlier6_edges_aggregated, aes(x = month, y = weightkg, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight (kg)", fill = "Category") +
+  ggtitle("Weight by Month and category") +
+  facet_wrap(~ year(arrivaldate))
+```
+
+## Outlier 7
+
+```{r}
+outlier7_edges_aggregated <- MC2_edges %>%
+  filter(source == "Mar y Luna Sagl" & target == "Saltwater Supreme ОАО Forwading") %>%
+  group_by(arrivaldate,hscode, valueofgoods_omu, 
+         volumeteu, weightkg, valueofgoodsusd) %>%
+  ungroup()
+```
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Extract the month from the 'arrivaldate'
+outlier7_edges_aggregated$month <- format(outlier7_edges_aggregated$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+outlier7_edges_aggregated$month <- factor(outlier7_edges_aggregated$month, levels = month.abb)
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+
+# Create the chart with facet wrap
+ggplot(outlier7_edges_aggregated, aes(x = month, y = weightkg, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight (kg)", fill = "Category") +
+  ggtitle("Weight by Month and category") +
+  facet_wrap(~ year(arrivaldate))
+```
+:::
+
+# Summary and conclusion
+
+Assuming that we only use the count of shipping between the source and
+node, we suspect that the these 7 companies may have participated on
+illegal fishing activities due to the count. To further scrutinize,
+based on the charts provided, it appears that apart from outlier 1, the
+remaining 6 sources and nodes exhibit irregularities in their patterns.
+The observed patterns in these companies align with the characteristics
+typically associated with illegal fishing operations. These companies
+tend to show periods of minimal or no activity during the analysis
+period, followed by or prior to abnormally high catches in terms of
+kilograms. Hence they should be closely examined
+
+# The second approach
+
+## Adding months in MC2_edges dataframe
+
+```{r, fig.height=20, fig.width=15}
+
+# Extract the month from the 'arrivaldate'
+MC2_edges$month <- format(MC2_edges$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+MC2_edges$month <- factor(MC2_edges$month, levels = month.abb)
+```
+
+Let's apply the categories identified from the bundles directly to the
+MC2 edge data
+
+## Weight examination of MC2_edges
+
+```{r, fig.height=15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+# Set the size of the plot
+options(repr.plot.width = 10, repr.plot.height = 6)
+
+# Create the chart with facet wrap
+ggplot(MC2_edges, aes(x = month, y = weightkg, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight (kg)", fill = "Category") +
+  ggtitle("Weight by Month and Category") +
+  facet_wrap(~ year(arrivaldate))
+```
+
+From the above chart (filled with weightkg for each category of catch)
+there is an interesting discovery we can see. Most of the periods have a
+relatively stable catch in terms of weight. Those with HS code with no
+categories seems to always take up highest proportion of weight.
+However, there are some abnormalies observed Aug, Oct and Dec of 2032
+and Jul and Aug of 2033 where in these months the proportion of
+categories surge and take up seemingly equal proporation of weight
+
+## Count exmination of MC2_edges
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+MC2_edges_aggregated_1 <- MC2_edges %>%
+  group_by(arrivaldate,source, target,category) %>%
+    summarise(weight = n()) %>%
+  filter(source!=target) %>%
+  filter(weight >= 1) %>%
+  ungroup()
+
+# Extract the month from the 'arrivaldate'
+MC2_edges_aggregated_1$month <- format(MC2_edges_aggregated_1$arrivaldate, "%b")
+
+# Convert the 'month' column to an ordered factor
+MC2_edges_aggregated_1$month <- factor(MC2_edges_aggregated_1$month, levels = month.abb)
+```
+
+```{r, fig.height=20, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Define a color palette with 12 distinct colors
+color_palette <- c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3", "#FF7F00", "#FFFF33", "#A65628", "#F781BF", "#999999", "#66C2A5", "#FC8D62", "#8DA0CB", "#FDAE61")
+
+# Set the size of the plot
+options(repr.plot.width = 10, repr.plot.height = 6)
+
+# Create the chart with facet wrap
+ggplot(MC2_edges_aggregated_1, aes(x = month, y = weight, fill = category)) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(values = color_palette) +
+  labs(x = "Month", y = "Weight", fill = "Category") +
+  ggtitle("Weight by Month and Category") +
+  facet_wrap(~ year(arrivaldate))
+```
+
+Above is a plot of the count of shipments of different categories of
+fishery against period. We can observe that the count is generally
+consistent across the years. Comparing the chart above with the plot for
+weight, it is fair to assume that illegal fishing may have occurred in
+aug,oct dec in 2032 and jul and aug in 2033 as the number of shipments
+remain consistent but amount of shipment spiked. This will serve as the
+basis for our analysis in detecting companies who might have engaged in
+illegal fishing.
+
+## Scrutinizing the irregularities
+
+Lets take these period out and plot these irregularities
+
+```{r, fig.height=40, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Convert weightkg column to numeric
+MC2_edges$weightkg <- as.numeric(MC2_edges$weightkg)
+
+# Filter the dataframe for the year 2032 and the months from August to December
+data_aug_dec_2032 <- filter(MC2_edges, 
+                            month(arrivaldate) %in% c(7,8, 9, 10, 11, 12) & 
+                            year(arrivaldate) == 2032)
+
+# Group the data by source, target, and month, and calculate the weightkg statistics
+pair_stats <- data_aug_dec_2032 %>%
+  group_by(source, target, month) %>%
+  summarise(
+    max_weight = max(weightkg)
+  )
+
+# Sort the pairs by max_weight in descending order
+pair_stats <- pair_stats %>%
+  arrange(desc(max_weight))
+
+# Take the top 100 pairs by weight
+top_pairs <- head(pair_stats, 100)
+library(plotly)
+# Create a bar plot to visualize the weightkg values for each pair with facet wrap by month
+p <- ggplot(top_pairs, aes(x = source, y = max_weight, fill = target, text = paste("Source: ", source, "<br>Target: ", target, "<br>Max Weight: ", max_weight))) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Weightkg Values for Top 100 Source-Target Pairs (Aug-Dec 2032)",
+       x = "Source", y = "Max Weightkg") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  facet_wrap(~ month, ncol = 2)+
+  guides(fill= FALSE)
+
+# Convert the ggplot plot to an interactive plotly plot
+plotly_plot <- ggplotly(p, tooltip = "text", height = 1000, width = 750)
+
+# Display the interactive plot
+plotly_plot
+```
+
+For the above chart, we have taken out top 100 source and pair
+transactions(in terms of max weightkg transacted) for second half of the
+year 2032. The left 3 graphs are non-abnormal month and the right are
+the abnormal month.
+
+Lets take a look at Jul and Aug 2033 where anomalies exist as well.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Filter the dataframe for the months July and August 2033
+data_jul_aug_2033 <- filter(MC2_edges,
+                            month(arrivaldate) %in% c(7, 8) &
+                            year(arrivaldate) == 2033)
+
+# Group the data by source, target, and month, and calculate the weightkg statistics for Jul-Aug 2033
+pair_stats_jul_aug_2033 <- data_jul_aug_2033 %>%
+  group_by(source, target, month) %>%
+  summarise(
+    max_weight = max(weightkg)
+  )
+
+# Sort the pairs by max_weight in descending order for Jul-Aug 2033
+pair_stats_jul_aug_2033 <- pair_stats_jul_aug_2033 %>%
+  arrange(desc(max_weight))
+
+# Take the top 100 pairs by weight for Jul-Aug 2033
+top_pairs_jul_aug_2033 <- head(pair_stats_jul_aug_2033, 100)
+
+# Create a bar plot to visualize the weightkg values for each pair with facet wrap by month for Jul-Aug 2033
+p_jul_aug_2033 <- ggplot(top_pairs_jul_aug_2033, aes(x = source, y = max_weight, fill = target, text = paste("Source: ", source, "<br>Target: ", target, "<br>Max Weight: ", max_weight))) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = "Weightkg Values for Top 100 Source-Target Pairs (Jul-Aug 2033)",
+       x = "Source", y = "Max Weightkg") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  facet_wrap(~ month, ncol = 2) +
+  guides(fill = FALSE)
+
+# Convert the ggplot plot to an interactive plotly plot
+plotly_plot_jul_aug_2033 <- ggplotly(p_jul_aug_2033, tooltip = "text", height = 600, width = 800)
+
+# Display the interactive plot for Jul-Aug 2033
+plotly_plot_jul_aug_2033
+
+```
+
+From these two charts, there is one main source node pair suspect we
+should closely examine: 'Jammu & Kashmir AB consultants' and 'Tamil Nadu
+Coporation Compass' . This pair of company has an extremely high
+weightkg in all months when there is a irregularity, in fact, it always
+has the top weightkg in the irregular months while low in those with a
+without, matching pattern of illegal fishing.
+
+## 'Jammu & Kashmir AB consultants' and 'Tamil Nadu Coporation Compass' associated companies
+
+Let's create a table to see other nodes which have 'Jammu & Kashmir AB
+consultants' and 'Tamil Nadu Coporation Compass' as source or a target
+node.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Specify the company names to search for
+company_names <- c('Jammu & Kashmir  AB Consultants', 'Tamil Nadu   Corporation Compass')
+
+
+# Filter the dataframe for rows where the source or target matches the company names
+filtered_data <- filter(MC2_edges, source %in% company_names | target %in% company_names)
+
+# Get the distinct sources and targets from the filtered data
+distinct_sources <- distinct(filtered_data, source) %>%
+  rename(node = source)
+distinct_targets <- distinct(filtered_data, target) %>%
+  rename(node = target)
+
+# Combine the distinct sources and targets
+distinct_nodes <- distinct_sources %>% bind_rows(distinct_targets)
+
+# Print the distinct sources and targets
+DT::datatable(distinct_nodes)
+```
+
+## Network chart of the pair
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Specify the company names to search for
+company_names <- c('Jammu & Kashmir  AB Consultants', 'Tamil Nadu   Corporation Compass')
+
+# Filter the dataframe for rows where the source or target matches the company names
+filtered_data <- MC2_edges %>%
+  filter(source %in% company_names | target %in% company_names) %>%
+  group_by(source, target) %>%
+  summarise(width = sum(weightkg)) %>%
+  ungroup()
+  
+
+# Get the distinct sources and targets from the filtered data
+distinct_sources <- filtered_data %>%
+  select(source) %>%
+  rename(id = source)
+distinct_targets <- filtered_data %>%
+  select(target) %>%
+  rename(id = target)
+
+# Combine the distinct sources and targets
+distinct_nodes <- rbind(distinct_sources, distinct_targets) %>%
+  distinct()
+
+# Create an igraph graph object
+graph <- graph_from_data_frame(d = filtered_data, vertices = distinct_nodes, directed = TRUE)
+
+# Set anomaly companies color
+anomaly_color <- "red"
+default_color <- "gray"
+
+# Create a color vector for node filling
+node_colors <- ifelse(
+  V(graph)$name %in% company_names,
+  anomaly_color,
+  default_color
+)
+
+
+
+
+# Plot the network graph
+ggraph(graph, layout = "fr") +
+  geom_edge_link() +
+  geom_node_point(aes(fill = node_colors), shape = 21, size = 5) +
+  scale_fill_manual(values = c(default_color, anomaly_color), guide = guide_legend(override.aes = list(shape = 21))) +
+  theme_graph() +
+  guides(fill = FALSE) +
+  theme() +
+  # Add labels for specific nodes
+  geom_node_text(
+    aes(label = ifelse(V(graph)$name %in% company_names, V(graph)$name, "")),
+    vjust = -1, size = 4, color = "black"
+  )
+```
+
+The chart above is a plot of all the companies that have either of the
+identified companies as a source or node. However, since we are only
+interested in the anomaly month, we can further filter this down and
+draw a ego network instead. Another interesting point is that there
+exist a handful of companies that have associated with both of the
+anomaly company. This is an area that may perhaps be worth exploring
+
+### Common companies
+
+This is a set of common companies that we may potentially explore.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Define the company names
+company_names <- c('Jammu & Kashmir  AB Consultants', 'Tamil Nadu   Corporation Compass')
+
+# Filter the dataframe for rows where the source or target matches the company names
+filtered_data <- filter(MC2_edges, source %in% company_names | target %in% company_names)
+
+# Exclude cases where the source and target are the same
+filtered_data <- filter(filtered_data, source != target)
+
+# Get the distinct sources and targets from the filtered data
+distinct_sources <- distinct(filtered_data, source) %>% rename(node = source)
+distinct_targets <- distinct(filtered_data, target) %>% rename(node = target)
+
+# Combine the distinct sources and targets
+distinct_nodes <- distinct_sources %>% bind_rows(distinct_targets)
+
+# Identify companies that have interacted with both specified companies
+common_companies <- distinct_nodes %>%
+  group_by(node) %>%
+  filter(n() == 2) %>%
+  ungroup()
+
+
+# Print the common companies
+DT::datatable(common_companies)
+```
+
+## Ego network - Jammu & Kashmir AB Consultants
+
+::: panel-tabset
+## Aug 2032
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Jammu & Kashmir  AB Consultants"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in August 2032
+filtered_data <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 8 & year(arrivaldate) == 2032)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data$source), unique(filtered_data$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+
+## Oct 2032
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Jammu & Kashmir  AB Consultants"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in October 2032
+filtered_data_1 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 10 & year(arrivaldate) == 2032)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_1$source), unique(filtered_data_1$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_1 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+
+## Dec 2032
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Jammu & Kashmir  AB Consultants"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in December 2032
+filtered_data_2 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 12 & year(arrivaldate) == 2032)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_2$source), unique(filtered_data_2$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_2 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+
+## Jul 2033
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Jammu & Kashmir  AB Consultants"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in July 2032
+filtered_data_3 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 7 & year(arrivaldate) == 2033)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_3$source), unique(filtered_data_3$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_3 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+
+## Aug 2033
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Jammu & Kashmir  AB Consultants"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in August 2033
+filtered_data_4 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 8 & year(arrivaldate) == 2033)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_4$source), unique(filtered_data_4$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_4 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+:::
+
+## Ego network - Tamil nadu Coporation Compass
+
+::: panel-tabset
+## Aug 2032
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Tamil Nadu   Corporation Compass"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in August 2032
+filtered_data_5 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 8 & year(arrivaldate) == 2032)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_5$source), unique(filtered_data_5$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_5 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+
+## Oct 2032
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Tamil Nadu   Corporation Compass"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in October 2032
+filtered_data_1 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 10 & year(arrivaldate) == 2032)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_1$source), unique(filtered_data_1$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_1 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+
+## Dec 2032
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Tamil Nadu   Corporation Compass"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in December 2032
+filtered_data_2 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 12 & year(arrivaldate) == 2032)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_2$source), unique(filtered_data_2$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_2 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+
+## Jul 2033
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Tamil Nadu   Corporation Compass"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in July 2033
+filtered_data_3 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 7 & year(arrivaldate) == 2033)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_3$source), unique(filtered_data_3$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_3 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+
+## Aug 2033
+
+```{r,fig.height= 15, fig.width=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+ego_company <- "Tamil Nadu   Corporation Compass"
+
+# Calculate the logarithm of the weightkg values to scale them
+MC2_edges$log_weightkg <- log(MC2_edges$weightkg)
+
+# Filter the dataframe for rows where the source or target is the ego company and it is in August 2033
+filtered_data_4 <- filter(MC2_edges, (source == ego_company | target == ego_company) & month(arrivaldate) == 8 & year(arrivaldate) == 2033)
+
+# Get the distinct sources and targets connected to the ego company
+neighbors <- union(unique(filtered_data_4$source), unique(filtered_data_4$target))
+
+# Combine the unique source and target values to get distinct company names
+companies <- union(ego_company, neighbors)
+
+# Create a data frame of nodes with unique IDs based on company names
+nodes <- data.frame(id = 1:length(companies), label = companies)
+
+
+# Create a data frame of edges to define the connections between the ego company and its neighbors
+edges <- filtered_data_4 %>%
+  select(source, target, log_weightkg) %>%
+  mutate(from = match(source, companies), to = match(target, companies))%>%
+group_by(source,target,from, to) %>%
+  summarise(value = sum(log_weightkg))
+
+
+# Create a visNetwork object
+ego_network <- visNetwork(nodes, edges)
+
+ego_network <- ego_network %>%
+  visPhysics(enabled = FALSE) %>%
+  visIgraphLayout(layout = "layout_as_star") %>%
+  visEdges(arrows = "to", 
+           smooth = list(enabled = TRUE 
+                    ) 
+           ) %>%
+  visOptions(nodesIdSelection = TRUE) %>%
+  visLayout(randomSeed = 123, improvedLayout = TRUE)
+
+# Plot the ego network
+ego_network
+```
+:::
+
+# Conclusion
+
+Base on these ego network graphs we identified potential companies which
+might have engaged in illegal fishing activities. They are:
+
+-   Jammu & Kashmir AB Consutants
+
+-   Tamil Nadu Coporation Compass
+
+-   Costa de la Felicidad United
+
+-   Kambala and A/S shipping
+
+-   -6586
+
+Kerala market OJSC United
+
+The companies were chosen due to their high weightkg transaction with
+either of the two companies during the anomaly months. Therefore, these
+selected companies should be further examined and the companies should
+also provide more details to justify their actions if they claim
+otherwise.
+
+However, this analysis has its own limitations as well.
+
+Limitations:
+
+-   Large increase in weightkg is consider abnormal
+
+-   Companies which engage in illegal fishing would knows who are the
+    sources / targets which they can trade with
+
+-   Second- layer companies are not aware of illegal fishing
+    activities - Quota for all companies are the same, therefore high
+    weight is abnormal
+
+-   Assumption that as the count of trade is similar across the years,
+    it is therefore abnormal for certain months to have sudden spike in
+    the weight without increase in count
+
+-   Many columns in the MC2 data files which are essential to analysis
+    seems to contain empty values which hiders better results
+
+-   Did not infuse external HScode data for analysis of fishing category
+    due to increased complexity
+
+\* Credits to Dr Kam Tin Seong for providing the
+[kickstarter](https://isss608-ay2022-23apr.netlify.app/take-home_ex/th_ex02/mc2-kick-starter1).
