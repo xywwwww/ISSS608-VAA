@@ -1,0 +1,667 @@
+---
+title: "Take-home_Ex03"
+execute: 
+  warning: false
+---
+
+# From kick-starter
+
+## **Getting Started**
+
+The code chunk below will be used to install and load the necessary R packages to meet the data preparation, data wrangling, data analysis and visualisation needs.
+
+```{r}
+pacman::p_load(jsonlite, tidygraph, ggraph, 
+               visNetwork, graphlayouts, ggforce, 
+               skimr, tidytext, tidyverse,igraph,DT,igraph)
+```
+
+1.  jsonlite: A package to work with JSON data in R, providing functions to convert JSON to R objects and vice versa. [**jsonlite on CRAN**](https://cran.r-project.org/package=jsonlite)
+
+2.  tidygraph: An R package that provides a tidy framework for working with graph data, enabling easy manipulation, visualization, and analysis of network structures. [**tidygraph on CRAN**](https://cran.r-project.org/package=tidygraph)
+
+3.  ggraph: A package built on top of the ggplot2 ecosystem, designed specifically for visualizing graph data using the grammar of graphics approach. [**ggraph on CRAN**](https://cran.r-project.org/package=ggraph)
+
+4.  visNetwork: An R package that allows interactive visualization of network data using the vis.js JavaScript library. It provides various features like customizing nodes and edges, tooltips, and animations. [**visNetwork on CRAN**](https://cran.r-project.org/package=visNetwork)
+
+5.  graphlayouts: A package that provides various layout algorithms for arranging the nodes in a network graph visualization. It offers different layout strategies to optimize the visual representation of graph structures. [**graphlayouts on CRAN**](https://cran.r-project.org/package=graphlayouts)
+
+6.  ggforce: An extension package for ggplot2 that provides additional geoms, stats, and scales to enhance and expand the functionality of the base ggplot2 package. [**ggforce on CRAN**](https://cran.r-project.org/package=ggforce)
+
+7.  skimr: A package for creating concise and informative summaries of data frames in R. It provides functions to quickly assess the data's structure, missing values, distributions, and other useful insights. [**skimr on CRAN**](https://cran.r-project.org/package=skimr)
+
+8.  tidytext: An R package that offers a framework for text mining and analysis using the tidyverse principles. It provides tools to manipulate, visualize, and model text data, making it easier to perform natural language processing tasks. [**tidytext on CRAN**](https://cran.r-project.org/package=tidytext)
+
+9.  tidyverse: A collection of R packages (including ggplot2, dplyr, tidyr, and others) that work together seamlessly to provide a consistent and efficient data manipulation and visualization workflow. [**tidyverse on CRAN**](https://cran.r-project.org/package=tidyverse)
+
+10. igraph: A popular R package for analyzing and visualizing graph data. It offers a wide range of graph algorithms, community detection methods, and visualization options to explore and understand network structures. [**igraph on CRAN**](https://cran.r-project.org/package=igraph)
+
+11.DT: An R package that allows you to create interactive and customizable data tables in R Markdown documents, Shiny applications, and RStudio viewers. It provides features like pagination, searching, sorting, and various customization options for displaying tabular data. DT on CRAN
+
+## **Data Import**
+
+In the code chunk below, `fromJSON()` of **jsonlite** package is used to import *MC3.json* into R environment.
+
+```{r}
+mc3_data <- fromJSON("data/MC3.json")
+```
+
+The output is called *mc3_data*. It is a large list R object.
+
+### **Extracting edges**
+
+The code chunk below will be used to extract the *links* data.frame of *mc3_data* and save it as a tibble data.frame called *mc3_edges*.
+
+```{r}
+mc3_edges <- as_tibble(mc3_data$links) %>% 
+  distinct() %>%
+  mutate(source = as.character(source),
+         target = as.character(target),
+         type = as.character(type)) %>%
+  group_by(source, target, type) %>%
+    summarise(weights = n()) %>%
+  filter(source!=target) %>%
+  ungroup()
+```
+
+::: callout-note
+## Things to learn from the code chunk above
+
+-   `distinct()` is used to ensure that there will be no duplicated records.
+
+-   `mutate()` and `as.character()` are used to convert the field data type from list to character.
+
+-   `group_by()` and `summarise()` are used to count the number of unique links.
+
+-   the `filter(source!=target)` is to ensure that no record with similar source and target.
+:::
+
+**Extracting nodes**
+
+The code chunk below will be used to extract the *nodes* data.frame of *mc3_data* and save it as a tibble data.frame called *mc3_nodes*.
+
+```{r}
+mc3_nodes <- as_tibble(mc3_data$nodes) %>%
+  mutate(country = as.character(country),
+         id = as.character(id),
+         product_services = as.character(product_services),
+         revenue_omu = as.numeric(as.character(revenue_omu)),
+         type = as.character(type)) %>%
+  select(id, country, type, revenue_omu, product_services)
+```
+
+::: callout-note
+## Things to learn from the code chunk above
+
+-   `mutate()` and `as.character()` are used to convert the field data type from list to character.
+
+-   To convert *revenue_omu* from list data type to numeric data type, we need to convert the values into character first by using `as.character()`. Then, `as.numeric()` will be used to convert them into numeric data type.
+
+-   `select()` is used to re-organise the order of the fields.
+:::
+
+## **Initial Data Exploration**
+
+### **Exploring the edges data frame**
+
+In the code chunk below, [`skim()`](https://docs.ropensci.org/skimr/reference/skim.html) of [**skimr**](https://docs.ropensci.org/skimr/) package is used to display the summary statistics of *mc3_edges* tibble data frame.
+
+```{r}
+skim(mc3_edges)
+```
+
+The report above reveals that there is not missing values in all fields.
+
+In the code chunk below, `datatable()` of DT package is used to display mc3_edges tibble data frame as an interactive table on the html document.
+
+```{r}
+DT::datatable(mc3_edges)
+```
+
+```{r}
+ggplot(data = mc3_edges,
+aes(x = type)) +
+geom_bar()
+```
+
+## **Initial Network Visualisation and Analysis**
+
+### **Building network model with tidygraph**
+
+```{r}
+id1 <- mc3_edges %>%
+  select(source) %>%
+  rename(id = source)
+id2 <- mc3_edges %>%
+  select(target) %>%
+  rename(id = target)
+mc3_nodes1 <- rbind(id1, id2) %>%
+  distinct() %>%
+  left_join(mc3_nodes,
+            unmatched = "drop")
+```
+
+```{r}
+mc3_graph <- tbl_graph(nodes = mc3_nodes1,
+                       edges = mc3_edges,
+                       directed = FALSE) %>%
+  mutate(betweenness_centrality = centrality_betweenness(),
+         closeness_centrality = centrality_closeness())
+```
+
+```{r}
+mc3_graph %>%
+  filter(betweenness_centrality >= 100000) %>%
+ggraph(layout = "fr") +
+  geom_edge_link(aes(alpha=0.5)) +
+  geom_node_point(aes(
+    size = betweenness_centrality,
+    colors = "lightblue",
+    alpha = 0.5)) +
+  scale_size_continuous(range=c(1,10))+
+  theme_graph()
+```
+
+```{r}
+top_nodes <- mc3_graph %>%
+  top_n(10, wt = betweenness_centrality) %>%
+  arrange(desc(betweenness_centrality))
+
+
+top_nodes_ids <- V(top_nodes)$id
+betweenness_centrality <- V(top_nodes)$betweenness_centrality
+closeness_centrality<- V(top_nodes)$closeness_centrality
+
+top_nodes_ids <- V(top_nodes)$id
+betweenness_centrality <- V(top_nodes)$betweenness_centrality
+closeness_centrality <- V(top_nodes)$closeness_centrality
+
+new_dataframe <- data.frame(
+  top_nodes_ids = top_nodes_ids,
+  betweenness_centrality = betweenness_centrality,
+  closeness_centrality = closeness_centrality
+)
+
+datatable(new_dataframe, class= "compact")
+
+```
+
+## **Exploring the nodes data frame**
+
+In the code chunk below, [`skim()`](https://docs.ropensci.org/skimr/reference/skim.html) of [**skimr**](https://docs.ropensci.org/skimr/) package is used to display the summary statistics of *mc3_nodes* tibble data frame.
+
+```{r}
+skim(mc3_nodes)
+```
+
+The report above reveals that there is missing values in revenue_omu and there are 78% missing values. We should consider removing the column.
+
+In the code chunk below, `datatable()` of DT package is used to display mc3_nodes tibble data frame as an interactive table on the html document.
+
+## **Text Sensing with tidytext**
+
+In this section, you will learn how to perform basic text sensing using appropriate functions of [**tidytext**](https://juliasilge.github.io/tidytext/) package.
+
+### **Simple word count**
+
+The code chunk below calculates number of times the word *fish* appeared in the field *product_services*.
+
+```{r}
+mc3_nodes %>% 
+    mutate(n_fish = str_count(product_services, "fish")) 
+```
+
+### **Tokenisation**
+
+The word tokenisation have different meaning in different scientific domains. In text sensing, **tokenisation** is the process of breaking up a given text into units called **tokens**. Tokens can be individual words, phrases or even whole sentences. In the process of tokenisation, some characters like punctuation marks may be discarded. The tokens usually become the input for the processes like parsing and text mining.
+
+In the code chunk below, [`unnest_token()`](https://juliasilge.github.io/tidytext/reference/unnest_tokens.html) of tidytext is used to split text in *product_services* field into words.
+
+```{r}
+token_nodes <- mc3_nodes %>%
+  unnest_tokens(word, 
+                product_services)
+```
+
+The two basic arguments to `unnest_tokens()` used here are column names. First we have the output column name that will be created as the text is unnested into it (*word*, in this case), and then the input column that the text comes from (*product_services*, in this case).
+
+::: callout-note
+-   By default, punctuation has been stripped. (Use the *to_lower = FALSE* argument to turn off this behavior).
+
+-   By default, `unnest_tokens()` converts the tokens to lowercase, which makes them easier to compare or combine with other datasets. (Use the *to_lower = FALSE* argument to turn off this behavior).
+:::
+
+Now we can visualise the words extracted by using the code chunk below.
+
+```{r}
+token_nodes %>%
+  count(word, sort = TRUE) %>%
+  top_n(15) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+      labs(x = "Count",
+      y = "Unique words",
+      title = "Count of unique words found in product_services field")
+```
+
+The bar chart reveals that the unique words contains some words that may not be useful to use. For instance "a" and "to". In the word of text mining we call those words **stop words**. You want to remove these words from your analysis as they are fillers used to compose a sentence.
+
+### **Removing stopwords**
+
+Lucky for us, the tidytext package has a function called [`stop_words`](https://juliasilge.github.io/tidytext/reference/stop_words.html) that will help us clean up stop words.
+
+Let's give this a try next!
+
+```{r}
+stopwords_removed <- token_nodes %>% 
+  anti_join(stop_words)
+```
+
+::: callout-note
+There are two processes:
+
+-   Load the stop_words data included with tidytext. This data is simply a list of words that you may want to remove in a natural language analysis.
+
+-   Then `anti_join()` of dplyr package is used to remove all stop words from the analysis.
+:::
+
+Now we can visualise the words extracted by using the code chunk below.
+
+```{r}
+stopwords_removed %>%
+  count(word, sort = TRUE) %>%
+  top_n(15) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+      labs(x = "Count",
+      y = "Unique words",
+      title = "Count of unique words found in product_services field")
+```
+
+::: callout-note
+All the stop words disappears!
+:::
+
+# End of kickstarter
+
+# Start of my own analysis (Qns 2)
+
+Now we will our own customized stopwords so that we can filter for top words in product services that are relevant to our analysis. Let's start by removing the first 3 words "character", "0", "unknown" which does not aid with our analysis. Then we run the code again to see if there are other words which can be removed. In the end I have chosen to remove "character", "0", "unknown", "including","related","products", "services", "equipment","offers"
+
+## Customizing stopwords
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Define your custom stopwords
+custom_stopwords <- tibble(word = c("character", "0", "unknown", "including","related","products", "services", "equipment","offers"))
+
+# Merge custom stopwords with existing stopwords
+all_stopwords <- bind_rows(stop_words, custom_stopwords)
+
+# Remove stopwords from the tokenized data
+stopwords_removed <- token_nodes %>% 
+  anti_join(all_stopwords)
+
+# Plot the count of unique words after removing stopwords
+stopwords_removed %>%
+  count(word, sort = TRUE) %>%
+  top_n(15) %>%
+  mutate(word = reorder(word, n)) %>%
+  ggplot(aes(x = word, y = n)) +
+  geom_col() +
+  xlab(NULL) +
+  coord_flip() +
+  labs(x = "Count",
+       y = "Unique words",
+       title = "Count of unique words found in product_services field")
+```
+
+As seen from above, I can identify 7 words which, with my own domain knowledge, believe that are related to the services of seafood and fishes. They are "fish", "seafood","frozen","food","fresh","salmon","canned" (The word "meat" is avoided to differentiate companies which sells other types of meat )
+
+## Adding count of unique words to data frame
+
+Let's add more columns from the unique words found in product_service field that are related to fishing or seafood in general to the MC3_node 3 data frame.
+
+```{r}
+mc3_nodes <- mc3_nodes %>% 
+  mutate(n_seafood = str_count(product_services, "seafood")) %>%
+  mutate(n_frozen = str_count(product_services, "frozen")) %>%
+  mutate(n_food = str_count(product_services, "food")) %>%
+  mutate(n_fresh = str_count(product_services, "fresh")) %>%
+  mutate(n_salmon = str_count(product_services, "salmon")) %>%
+  mutate(n_canned = str_count(product_services, "canned")) %>%
+  mutate(n_fish = str_count(product_services, "fish")) 
+
+```
+
+## Filtering the nodes
+
+Now, let's remove the nodes that does not contain these key words. i.e. the count of these keywords is 0. We will put these nodes under a new variable name called "mc3_nodes_filtered".
+
+```{r}
+mc3_nodes_filtered <- mc3_nodes %>% 
+  filter(n_fish > 0 | n_seafood > 0 | n_frozen > 0 | n_food > 0 | n_fresh > 0 | n_salmon > 0 | n_canned > 0)
+```
+
+## Filtering the edges
+
+Now since we filtered out the nodes that are related to the the fishery industry. Let's move on to the edges data frame and filter out rows that does not involve any of the of the identified nodes. The code below will result in a new data frame that contains the filtered nodes in either the source or target column
+
+```{r}
+mc3_edges_filtered <- mc3_edges %>%
+  filter(source %in% mc3_nodes_filtered$id | target %in% mc3_nodes_filtered$id)
+```
+
+## Building network model with tidygraph
+
+```{r}
+id1 <- mc3_edges_filtered %>%
+  select(source) %>%
+  rename(id = source)
+id2 <- mc3_edges_filtered %>%
+  select(target) %>%
+  rename(id = target)
+mc3_nodes1 <- rbind(id1, id2) %>%
+  distinct() %>%
+  left_join(mc3_nodes_filtered%>%
+  select(-starts_with("n_")),
+            unmatched = "drop")
+```
+
+```{r}
+mc3_graph <- tbl_graph(nodes = mc3_nodes1,
+                       edges = mc3_edges_filtered,
+                       directed = FALSE)%>%
+                      mutate(betweenness_centrality = centrality_betweenness(),
+                      closeness_centrality = centrality_closeness())
+```
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+mc3_graph %>%
+ggraph(layout = "kk") +
+  geom_edge_link() +
+  geom_node_point() +
+  scale_size_continuous(range=c(1,10))+
+  theme_graph()
+
+```
+
+This graph is formed by all the filtered edges and nodes with keywords in product_services that relates to marine life. It is large and complex.
+
+```{r}
+mc3_graph
+```
+
+## Analyzing centrality
+
+Now, let's take a look at the centrality of some of the nodes with the focus on betweenness centrality. This is because, betweenness centrality is a measure of centrality in a graph based on shortest paths. In other words, it shows the importance of nodes base on information passed through the nodes. This is important for us to identify similar business because if the node belong to a certain industry, it is highly likely that the business that communicate with it also belong to a similar industry. I have pulled out the closeness centrality as well for comparison. This centrality will be less of a focus because it measure the the speed of information spreading which is less relevant for our analysis.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Get the top 10 nodes with highest betweenness centrality
+top_nodes <- mc3_graph%>%
+  top_n(10, wt = betweenness_centrality) %>%
+  arrange(desc(betweenness_centrality))
+
+
+top_nodes_ids <- V(top_nodes)$id
+betweenness_centrality <- V(top_nodes)$betweenness_centrality
+closeness_centrality<- V(top_nodes)$closeness_centrality
+
+new_dataframe <- data.frame(
+  top_nodes_ids = top_nodes_ids,
+  betweenness_centrality = betweenness_centrality,
+  closeness_centrality = closeness_centrality
+)
+
+datatable(new_dataframe, class= "compact")
+
+```
+
+## Clustering algorithm
+
+Let's use the Louvain clustering algorithm to see how many communities it can detect from the graph. I have tried to use infomap,edge betweeness,walktrap clustering algorithms as well but overall results appears to be similar so let's just use Louvain for our analysis.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+louvain_partition <- cluster_louvain(mc3_graph, weights = NA) 
+# assign communities to graph 
+mc3_graph$community <- louvain_partition$membership 
+# see how many communities there are 
+unique(mc3_graph$community) 
+```
+
+From the above, we observe that there are 601 communities detected. This is a very large number. However, given that we have 3020 nodes in the graph and the number of attributes are limited. We will stay on with these communities.
+
+## Graphing the communities
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Give nodes properties, including scaling them by degree and coloring them by community
+V(mc3_graph)$size <- degree(mc3_graph) * 0.5
+V(mc3_graph)$frame.color <- "white"
+V(mc3_graph)$color <- mc3_graph$community
+V(mc3_graph)$label <- V(mc3_graph)$id
+V(mc3_graph)$label.cex <- 1.5
+
+# Color edges according to their starting node
+edge.start <- ends(mc3_graph, es = E(mc3_graph), names = FALSE)[, 1]
+E(mc3_graph)$color <- V(mc3_graph)$color[edge.start]
+E(mc3_graph)$arrow.mode <- 0
+
+# Label nodes based on specific condition or criteria
+# Modify this part based on your requirements
+v_labels <- which(V(mc3_graph)$betweenness_centrality > 700) # Only those with more than 700 betweenness are labelled
+
+for (i in 1:length(V(mc3_graph))) {
+  if (!(i %in% v_labels)) {
+    V(mc3_graph)$label[i] <- ""
+  }
+}
+
+```
+
+```{r, fig.width= 15, fig.height=15}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+l1 <- layout_on_sphere(mc3_graph)
+plot(mc3_graph, rescale = T, layout = l1, main = "MC3 community")
+```
+
+## Analyzing the communities
+
+Given such a large number of communities, let's pick the largest 10 communities and further examine its components.
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+# Calculate community sizes
+community_sizes <- table(mc3_graph$community)
+
+# Sort community sizes in descending order
+sorted_sizes <- sort(community_sizes, decreasing = TRUE)
+
+# Select top 10 largest communities
+largest_communities <- names(sorted_sizes)[1:10]
+
+node_services <- data.frame(id = V(mc3_graph)$id)
+node_services$product_services <- mc3_nodes1$product_services[match(node_services$id, mc3_nodes1$id)]
+
+```
+
+::: panel-tabset
+
+# Community 1
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+community1 <- largest_communities[1]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community1]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 2
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community2 <- largest_communities[2]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community2]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 3
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community3 <- largest_communities[3]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community3]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 4
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community4 <- largest_communities[4]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community4]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 5
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community5 <- largest_communities[5]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community5]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 6
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community6 <- largest_communities[6]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community6]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 7
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community7 <- largest_communities[7]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community7]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 8
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community8 <- largest_communities[8]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community8]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 9
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community9 <- largest_communities[9]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community9]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+
+# Community 10
+
+```{r}
+#| code-fold: true
+#| code-summary: "Show the code"
+
+
+community10 <- largest_communities[10]
+nodes <- V(mc3_graph)$id[mc3_graph$community == community10]
+community_services <- node_services[node_services$id %in% nodes, c("id", "product_services")]
+
+datatable(community_services)
+
+```
+:::
+
+From the above, we see that most of the communities with similar product_services description are grouped together. We also see that the communities includes individual personnel representing the companies as well. This might be an indication that the representatives of the companies may interact closely with the identified companies.
+
+It is also interesting to note that majority of the top 10 nodes with the highest betweenness centrality (identified earlier) belong to different communities. This might be an indication that these companies themselves are major players who may be running their own network of marine life trades
+
+-   Credits to [Dr Kam Tin Seong](https://www.smu.edu.sg/faculty/profile/9618/KAM-Tin-Seong) for providing the Kickstarter

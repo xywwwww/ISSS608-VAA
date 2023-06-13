@@ -144,10 +144,7 @@ ggplot(data, aes(x = weight)) +
 
 ```
 
-From the above chart, we see that majority of the count of weights lies
-below count of 15000 so lets set weight of 15000 as an acceptable range
-of weight and we will examine those source and nodes which fall beyond
-the range.
+From the above chart, we see that majority of the count of weights lies below count of 15000 so lets set weight of 15000 as an acceptable range of weight and we will examine those source and nodes which fall beyond the range.
 
 Let's retrieve the source and target node of these companies.
 
@@ -194,8 +191,7 @@ outliers <- outliers[order(outliers$Weight, decreasing = TRUE), ]
 outliers
 ```
 
-Hence we will examine these source and node pairs with these extremely
-large weights in details
+Hence we will examine these source and node pairs with these extremely large weights in details
 
 ## Examining outliers
 
@@ -228,10 +224,7 @@ ggplot(outlier1_edges_aggregated, aes(x = month, y = weightkg, fill = hscode)) +
   guides(fill = FALSE)
 ```
 
-The above graph is not much of use other than informing that DEC 2033
-and Aug 2034 have some extremely large values as they are categorized by
-hscodes. We need to use the bundle data set to group the hscode together
-and visualize this again.
+The above graph is not much of use other than informing that DEC 2033 and Aug 2034 have some extremely large values as they are categorized by hscodes. We need to use the bundle data set to group the hscode together and visualize this again.
 
 # Bundle manipulation
 
@@ -1055,16 +1048,7 @@ ggplot(outlier7_edges_aggregated, aes(x = month, y = weightkg, fill = category))
 
 # Summary and conclusion
 
-Assuming that we only use the count of shipping between the source and
-node, we suspect that the these 7 companies may have participated on
-illegal fishing activities due to the count. To further scrutinize,
-based on the charts provided, it appears that apart from outlier 1, the
-remaining 6 sources and nodes exhibit irregularities in their patterns.
-The observed patterns in these companies align with the characteristics
-typically associated with illegal fishing operations. These companies
-tend to show periods of minimal or no activity during the analysis
-period, followed by or prior to abnormally high catches in terms of
-kilograms. Hence they should be closely examined
+Assuming that we only use the count of shipping between the source and node, we suspect that the these 7 companies may have participated on illegal fishing activities due to the count. To further scrutinize, based on the charts provided, it appears that apart from outlier 1, the remaining 6 sources and nodes exhibit irregularities in their patterns. The observed patterns in these companies align with the characteristics typically associated with illegal fishing operations. These companies tend to show periods of minimal or no activity during the analysis period, followed by or prior to abnormally high catches in terms of kilograms. Hence they should be closely examined
 
 # The second approach
 
@@ -1079,8 +1063,7 @@ MC2_edges$month <- format(MC2_edges$arrivaldate, "%b")
 MC2_edges$month <- factor(MC2_edges$month, levels = month.abb)
 ```
 
-Let's apply the categories identified from the bundles directly to the
-MC2 edge data
+Let's apply the categories identified from the bundles directly to the MC2 edge data
 
 ## Weight examination of MC2_edges
 
@@ -1103,13 +1086,7 @@ ggplot(MC2_edges, aes(x = month, y = weightkg, fill = category)) +
   facet_wrap(~ year(arrivaldate))
 ```
 
-From the above chart (filled with weightkg for each category of catch)
-there is an interesting discovery we can see. Most of the periods have a
-relatively stable catch in terms of weight. Those with HS code with no
-categories seems to always take up highest proportion of weight.
-However, there are some abnormalies observed Aug, Oct and Dec of 2032
-and Jul and Aug of 2033 where in these months the proportion of
-categories surge and take up seemingly equal proporation of weight
+From the above chart (filled with weightkg for each category of catch) there is an interesting discovery we can see. Most of the periods have a relatively stable catch in terms of weight. Those with HS code with no categories seems to always take up highest proportion of weight. However, there are some abnormalies observed Aug, Oct and Dec of 2032 and Jul and Aug of 2033 where in these months the proportion of categories surge and take up seemingly equal proporation of weight
 
 ## Count exmination of MC2_edges
 
@@ -1150,14 +1127,7 @@ ggplot(MC2_edges_aggregated_1, aes(x = month, y = weight, fill = category)) +
   facet_wrap(~ year(arrivaldate))
 ```
 
-Above is a plot of the count of shipments of different categories of
-fishery against period. We can observe that the count is generally
-consistent across the years. Comparing the chart above with the plot for
-weight, it is fair to assume that illegal fishing may have occurred in
-aug,oct dec in 2032 and jul and aug in 2033 as the number of shipments
-remain consistent but amount of shipment spiked. This will serve as the
-basis for our analysis in detecting companies who might have engaged in
-illegal fishing.
+Above is a plot of the count of shipments of different categories of fishery against period. We can observe that the count is generally consistent across the years. Comparing the chart above with the plot for weight, it is fair to assume that illegal fishing may have occurred in aug,oct dec in 2032 and jul and aug in 2033 as the number of shipments remain consistent but amount of shipment spiked. This will serve as the basis for our analysis in detecting companies who might have engaged in illegal fishing.
 
 ## Scrutinizing the irregularities
 
@@ -1205,10 +1175,7 @@ plotly_plot <- ggplotly(p, tooltip = "text", height = 1000, width = 750)
 plotly_plot
 ```
 
-For the above chart, we have taken out top 100 source and pair
-transactions(in terms of max weightkg transacted) for second half of the
-year 2032. The left 3 graphs are non-abnormal month and the right are
-the abnormal month.
+For the above chart, we have taken out top 100 source and pair transactions(in terms of max weightkg transacted) for second half of the year 2032. The left 3 graphs are non-abnormal month and the right are the abnormal month.
 
 Lets take a look at Jul and Aug 2033 where anomalies exist as well.
 
@@ -1252,18 +1219,11 @@ plotly_plot_jul_aug_2033
 
 ```
 
-From these two charts, there is one main source node pair suspect we
-should closely examine: 'Jammu & Kashmir AB consultants' and 'Tamil Nadu
-Coporation Compass' . This pair of company has an extremely high
-weightkg in all months when there is a irregularity, in fact, it always
-has the top weightkg in the irregular months while low in those with a
-without, matching pattern of illegal fishing.
+From these two charts, there is one main source node pair suspect we should closely examine: 'Jammu & Kashmir AB consultants' and 'Tamil Nadu Coporation Compass' . This pair of company has an extremely high weightkg in all months when there is a irregularity, in fact, it always has the top weightkg in the irregular months while low in those with a without, matching pattern of illegal fishing.
 
 ## 'Jammu & Kashmir AB consultants' and 'Tamil Nadu Coporation Compass' associated companies
 
-Let's create a table to see other nodes which have 'Jammu & Kashmir AB
-consultants' and 'Tamil Nadu Coporation Compass' as source or a target
-node.
+Let's create a table to see other nodes which have 'Jammu & Kashmir AB consultants' and 'Tamil Nadu Coporation Compass' as source or a target node.
 
 ```{r}
 #| code-fold: true
@@ -1350,12 +1310,7 @@ ggraph(graph, layout = "fr") +
   )
 ```
 
-The chart above is a plot of all the companies that have either of the
-identified companies as a source or node. However, since we are only
-interested in the anomaly month, we can further filter this down and
-draw a ego network instead. Another interesting point is that there
-exist a handful of companies that have associated with both of the
-anomaly company. This is an area that may perhaps be worth exploring
+The chart above is a plot of all the companies that have either of the identified companies as a source or node. However, since we are only interested in the anomaly month, we can further filter this down and draw a ego network instead. Another interesting point is that there exist a handful of companies that have associated with both of the anomaly company. This is an area that may perhaps be worth exploring
 
 ### Common companies
 
@@ -1892,8 +1847,7 @@ ego_network
 
 # Conclusion
 
-Base on these ego network graphs we identified potential companies which
-might have engaged in illegal fishing activities. They are:
+Base on these ego network graphs we identified potential companies which might have engaged in illegal fishing activities. They are:
 
 -   Jammu & Kashmir AB Consutants
 
@@ -1907,11 +1861,7 @@ might have engaged in illegal fishing activities. They are:
 
 Kerala market OJSC United
 
-The companies were chosen due to their high weightkg transaction with
-either of the two companies during the anomaly months. Therefore, these
-selected companies should be further examined and the companies should
-also provide more details to justify their actions if they claim
-otherwise.
+The companies were chosen due to their high weightkg transaction with either of the two companies during the anomaly months. Therefore, these selected companies should be further examined and the companies should also provide more details to justify their actions if they claim otherwise.
 
 However, this analysis has its own limitations as well.
 
@@ -1919,22 +1869,14 @@ Limitations:
 
 -   Large increase in weightkg is consider abnormal
 
--   Companies which engage in illegal fishing would knows who are the
-    sources / targets which they can trade with
+-   Companies which engage in illegal fishing would knows who are the sources / targets which they can trade with
 
--   Second- layer companies are not aware of illegal fishing
-    activities - Quota for all companies are the same, therefore high
-    weight is abnormal
+-   Second- layer companies are not aware of illegal fishing activities - Quota for all companies are the same, therefore high weight is abnormal
 
--   Assumption that as the count of trade is similar across the years,
-    it is therefore abnormal for certain months to have sudden spike in
-    the weight without increase in count
+-   Assumption that as the count of trade is similar across the years, it is therefore abnormal for certain months to have sudden spike in the weight without increase in count
 
--   Many columns in the MC2 data files which are essential to analysis
-    seems to contain empty values which hiders better results
+-   Many columns in the MC2 data files which are essential to analysis seems to contain empty values which hiders better results
 
--   Did not infuse external HScode data for analysis of fishing category
-    due to increased complexity
+-   Did not infuse external HScode data for analysis of fishing category due to increased complexity
 
-\* Credits to Dr Kam Tin Seong for providing the
-[kickstarter](https://isss608-ay2022-23apr.netlify.app/take-home_ex/th_ex02/mc2-kick-starter1).
+\* Credits to Dr Kam Tin Seong for providing the [kickstarter](https://isss608-ay2022-23apr.netlify.app/take-home_ex/th_ex02/mc2-kick-starter1).
