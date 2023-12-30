@@ -4,6 +4,6 @@ title: "About"
 
 About this site
 
-```{r}
-1 + 1
-```
+Site is created for the purpose of assignments for ISSS608
+
+Updates will be at unspecified times
